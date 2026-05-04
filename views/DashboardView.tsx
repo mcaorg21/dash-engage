@@ -662,8 +662,8 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(255,255,255,0.1),rgba(6,26,90,0.18)_38%,rgba(3,12,40,0.72)_100%)]" />
         <div className="absolute inset-0 opacity-[0.06] [background-image:radial-gradient(rgba(255,255,255,0.75)_1px,transparent_1px)] [background-size:4px_4px]" />
 
-        <div className="relative flex items-center justify-between border-b border-white/15 p-6">
-          <div className="min-w-0">
+        <div className="relative flex items-center justify-center border-b border-white/15 p-6">
+          <div className="min-w-0 text-center">
             {showLogoFallback ? (
               <>
                 <div className="text-lg font-bold">Dash Engage</div>
@@ -673,12 +673,12 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
               <img
                 src={INTERNAL_LOGO_SRC}
                 alt="Dash Engage"
-                className="h-10 max-w-44 object-contain"
+                className="h-8 max-w-36 object-contain"
                 onError={() => setShowLogoFallback(true)}
               />
             )}
           </div>
-          <button className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
+          <button className="absolute right-4 rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
             <X size={22} />
           </button>
         </div>
