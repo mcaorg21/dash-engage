@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import JSZip from 'jszip';
 import { ChevronDown, ChevronRight, Download, FileText, LayoutDashboard, List, LogOut, Menu, RefreshCw, Upload, Users, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import { api } from '../utils/api';
@@ -117,9 +118,8 @@ const jsonToXmlDocument = (value: unknown) => {
 
   const entries = Object.entries(value as Record<string, unknown>);
   const body = entries.map(([key, childValue]) => jsonToXmlNode(key, childValue)).join('');
-  const xmlBody = entries.length === 1 ? body : `<root>${body}</root>`;
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n${xmlBody}`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${body}`;
 };
 
 const getXmlContent = (xmlSource: unknown) => {
@@ -149,23 +149,37 @@ const downloadXml = (row: Record<string, unknown>) => {
   downloadTextFile(xmlContent, `lancamento-${formatCellValue(row.id)}.xml`);
 };
 
-const downloadFilteredXml = (rows: Record<string, unknown>[]) => {
-  const items = rows
-    .map(row => {
-      const xmlContent = getXmlContent(row.json_xml).replace(/^\s*<\?xml[^>]*>\s*/i, '');
-      if (!xmlContent) return '';
+const downloadBlobFile = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
-      return `<lancamento id="${escapeXml(row.id)}" chave_cte="${escapeXml(row.chave_cte)}">${xmlContent}</lancamento>`;
-    })
-    .filter(Boolean)
-    .join('\n');
+const downloadFilteredXmlZip = async (rows: Record<string, unknown>[]) => {
+  const zip = new JSZip();
+  let total = 0;
 
-  if (!items) return;
+  rows.forEach(row => {
+    const xmlContent = getXmlContent(row.json_xml);
+    if (!xmlContent) return;
 
-  downloadTextFile(
-    `<?xml version="1.0" encoding="UTF-8"?>\n<lancamentos>\n${items}\n</lancamentos>`,
-    'lancamentos-qivez-filtrados.xml'
-  );
+    const id = formatCellValue(row.id).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const chaveCte = formatCellValue(row.chave_cte).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = chaveCte && chaveCte !== '-' ? `${chaveCte}.xml` : `lancamento-${id}.xml`;
+
+    zip.file(filename, xmlContent);
+    total += 1;
+  });
+
+  if (total === 0) return;
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  downloadBlobFile(blob, 'lancamentos-cte-filtrados.zip');
 };
 
 const QivezListarView = () => {
@@ -259,7 +273,7 @@ const QivezListarView = () => {
                 type="button"
                 disabled={rows.length === 0}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--engage-blue-400)]/10 px-4 py-2 text-sm font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40"
-                onClick={() => downloadFilteredXml(rows)}
+                onClick={() => downloadFilteredXmlZip(rows)}
               >
                 <Download size={16} />
                 Baixar filtrados
