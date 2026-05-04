@@ -46,6 +46,235 @@ const QivezPlaceholderView = ({ tab }: { tab: string }) => {
   );
 };
 
+const formatCellValue = (value: unknown) => {
+  if (value === null || value === undefined) return '-';
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Nao';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+};
+
+const escapeXml = (value: unknown) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&apos;');
+
+const isXmlAttribute = (key: string) => key === 'xmlns' || key.startsWith('@');
+
+const jsonToXmlNode = (key: string, value: unknown): string => {
+  const tagName = key.startsWith('@') ? key.slice(1) : key;
+
+  if (Array.isArray(value)) {
+    return value.map(item => jsonToXmlNode(tagName, item)).join('');
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const attributes = Object.entries(record)
+      .filter(([childKey]) => isXmlAttribute(childKey))
+      .map(([childKey, childValue]) => {
+        const attributeName = childKey.startsWith('@') ? childKey.slice(1) : childKey;
+        return ` ${attributeName}="${escapeXml(childValue)}"`;
+      })
+      .join('');
+
+    const children = Object.entries(record)
+      .filter(([childKey]) => !isXmlAttribute(childKey))
+      .map(([childKey, childValue]) => jsonToXmlNode(childKey, childValue))
+      .join('');
+
+    return `<${tagName}${attributes}>${children}</${tagName}>`;
+  }
+
+  return `<${tagName}>${escapeXml(value)}</${tagName}>`;
+};
+
+const jsonToXmlDocument = (value: unknown) => {
+  if (!value || typeof value !== 'object') return String(value ?? '');
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  const body = entries.map(([key, childValue]) => jsonToXmlNode(key, childValue)).join('');
+  const xmlBody = entries.length === 1 ? body : `<root>${body}</root>`;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${xmlBody}`;
+};
+
+const downloadXml = (row: Record<string, unknown>) => {
+  const xmlSource = row.json_xml;
+  if (!xmlSource) return;
+
+  const xmlContent = typeof xmlSource === 'string' && xmlSource.trim().startsWith('<')
+    ? xmlSource
+    : jsonToXmlDocument(xmlSource);
+
+  const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `lancamento-${formatCellValue(row.id)}.xml`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+const QivezListarView = () => {
+  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '' });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRows = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const data = await api.getQivezLancamentos(appliedFilters);
+        if (!cancelled) setRows(data);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Erro ao carregar lancamentos.');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadRows();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appliedFilters]);
+
+  const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const displayColumns = columns.filter(column => column !== 'json_xml');
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">Qivez - Listar</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Lancamentos financeiros sem Qives Sysemp, ordenados por ID.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-6 py-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="text-sm font-bold text-slate-700">Lancamentos</div>
+              <div className="mt-1 text-xs font-medium text-slate-400">
+                SELECT * FROM public.lancamentos_financeiros WHERE existe_qives_sysemp = false ORDER BY id ASC
+              </div>
+            </div>
+
+            <form
+              className="flex flex-col gap-3 sm:flex-row sm:items-end"
+              onSubmit={event => {
+                event.preventDefault();
+                setAppliedFilters({ dataInicio, dataFim });
+              }}
+            >
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Inicio</label>
+                <input
+                  type="date"
+                  value={dataInicio}
+                  onChange={event => setDataInicio(event.target.value)}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Fim</label>
+                <input
+                  type="date"
+                  value={dataFim}
+                  onChange={event => setDataFim(event.target.value)}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                />
+              </div>
+
+              <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
+                Filtrar
+              </button>
+
+              <button
+                type="button"
+                className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100"
+                onClick={() => {
+                  setDataInicio('');
+                  setDataFim('');
+                  setAppliedFilters({ dataInicio: '', dataFim: '' });
+                }}
+              >
+                Limpar
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {isLoading && (
+          <div className="p-8 text-sm font-medium text-slate-500">Carregando lancamentos...</div>
+        )}
+
+        {error && (
+          <div className="p-8 text-sm font-medium text-red-600">{error}</div>
+        )}
+
+        {!isLoading && !error && rows.length === 0 && (
+          <div className="p-8 text-sm font-medium text-slate-500">Nenhum lancamento encontrado.</div>
+        )}
+
+        {!isLoading && !error && rows.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-max border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Download
+                  </th>
+                  {displayColumns.map(column => (
+                    <th key={column} className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+                      {column}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {rows.map((row, rowIndex) => (
+                  <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <button
+                        type="button"
+                        disabled={!row.json_xml}
+                        onClick={() => downloadXml(row)}
+                        className="rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        XML
+                      </button>
+                    </td>
+                    {displayColumns.map(column => (
+                      <td key={column} className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row[column])}>
+                        {formatCellValue(row[column])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -224,7 +453,11 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
             </div>
           )}
 
-          {qivezTabs.some(tab => tab.id === activeTab) && hasPermission(activeTab) && (
+          {activeTab === 'conciliacao_qivez_listar' && hasPermission('conciliacao_qivez_listar') && (
+            <QivezListarView />
+          )}
+
+          {activeTab !== 'conciliacao_qivez_listar' && qivezTabs.some(tab => tab.id === activeTab) && hasPermission(activeTab) && (
             <QivezPlaceholderView tab={activeTab} />
           )}
         </div>

@@ -35,6 +35,8 @@ export interface LoginResponse {
   user: UserData;
 }
 
+export type QivezLancamento = Record<string, unknown>;
+
 export const api = {
   login: (email: string, password: string) =>
     request<LoginResponse>('/auth/login', {
@@ -74,4 +76,13 @@ export const api = {
     request<{ message: string }>(`/users/${encodeURIComponent(email)}`, {
       method: 'DELETE',
     }),
+
+  getQivezLancamentos: (filters: { dataInicio?: string; dataFim?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
+    if (filters.dataFim) params.set('dataFim', filters.dataFim);
+
+    const query = params.toString();
+    return request<QivezLancamento[]>(`/qivez/lancamentos${query ? `?${query}` : ''}`);
+  },
 };
