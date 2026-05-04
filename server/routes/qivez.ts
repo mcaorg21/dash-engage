@@ -39,7 +39,14 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
       ORDER BY 1
     `);
 
-    res.json(result.rows);
+    res.json(result.rows.map(row => ({
+      mes: row.mes,
+      total: Number(row.total || 0),
+      total_true: Number(row.total_true || 0),
+      total_false: Number(row.total_false || 0),
+      soma_false: Number(row.soma_false || 0),
+      media_false: Number(row.media_false || 0),
+    })));
   } catch (err) {
     console.error('Qivez dashboard error:', err);
     res.status(500).json({ error: 'Erro interno do servidor' });

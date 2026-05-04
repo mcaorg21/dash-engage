@@ -146,11 +146,10 @@ const QivezPainelView = () => {
       totalTrue: acc.totalTrue + Number(row.total_true || 0),
       totalFalse: acc.totalFalse + Number(row.total_false || 0),
       somaFalse: acc.somaFalse + Number(row.soma_false || 0),
-      mediaFalseBase: acc.mediaFalseBase + (Number(row.total_false || 0) * Number(row.media_false || 0)),
     }),
-    { total: 0, totalTrue: 0, totalFalse: 0, somaFalse: 0, mediaFalseBase: 0 }
+    { total: 0, totalTrue: 0, totalFalse: 0, somaFalse: 0 }
   );
-  const mediaFalse = totals.totalFalse ? totals.mediaFalseBase / totals.totalFalse : 0;
+  const mediaFalse = totals.totalFalse ? totals.somaFalse / totals.totalFalse : 0;
   const maxValue = Math.max(...rows.map(row => Number(row.total || 0)), 1);
   const maxPendingValue = Math.max(...rows.map(row => Number(row.total_false || 0)), 1);
   const lastMonth = rows[rows.length - 1];
