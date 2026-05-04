@@ -90,7 +90,9 @@ const QivezPainelView = () => {
     label: string;
     value: number;
     percent: number;
+    id: string;
   } | null>(null);
+  const [isChartTooltipPinned, setIsChartTooltipPinned] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -221,15 +223,41 @@ const QivezPainelView = () => {
                                   rx="4"
                                   fill={item.color}
                                   className="cursor-pointer transition-opacity hover:opacity-80"
-                                  onMouseEnter={() => setChartTooltip({
-                                    x: x + barWidth / 2,
-                                    y,
-                                    mes: formatMonthPt(row.mes),
-                                    label: item.label,
-                                    value,
-                                    percent,
-                                  })}
-                                  onMouseLeave={() => setChartTooltip(null)}
+                                  onMouseEnter={() => {
+                                    if (isChartTooltipPinned) return;
+                                    setChartTooltip({
+                                      x: x + barWidth / 2,
+                                      y,
+                                      mes: formatMonthPt(row.mes),
+                                      label: item.label,
+                                      value,
+                                      percent,
+                                      id: `${row.mes}-${item.key}`,
+                                    });
+                                  }}
+                                  onMouseLeave={() => {
+                                    if (!isChartTooltipPinned) setChartTooltip(null);
+                                  }}
+                                  onClick={() => {
+                                    const nextTooltip = {
+                                      x: x + barWidth / 2,
+                                      y,
+                                      mes: formatMonthPt(row.mes),
+                                      label: item.label,
+                                      value,
+                                      percent,
+                                      id: `${row.mes}-${item.key}`,
+                                    };
+
+                                    if (isChartTooltipPinned && chartTooltip?.id === nextTooltip.id) {
+                                      setIsChartTooltipPinned(false);
+                                      setChartTooltip(null);
+                                      return;
+                                    }
+
+                                    setChartTooltip(nextTooltip);
+                                    setIsChartTooltipPinned(true);
+                                  }}
                                 />
                               );
                             })}
@@ -239,26 +267,36 @@ const QivezPainelView = () => {
                           </g>
                         ))}
                         {chartTooltip && (
-                          <g pointerEvents="none">
-                            <rect
-                              x={Math.min(Math.max(chartTooltip.x - 82, 58), 788)}
-                              y={Math.max(chartTooltip.y - 74, 12)}
-                              width="150"
-                              height="58"
-                              rx="8"
-                              fill="#0f172a"
-                              opacity="0.94"
-                            />
-                            <text x={Math.min(Math.max(chartTooltip.x - 70, 70), 800)} y={Math.max(chartTooltip.y - 51, 35)} className="fill-white text-[11px] font-bold">
-                              {chartTooltip.mes} - {chartTooltip.label}
-                            </text>
-                            <text x={Math.min(Math.max(chartTooltip.x - 70, 70), 800)} y={Math.max(chartTooltip.y - 31, 55)} className="fill-slate-200 text-[11px] font-medium">
-                              {formatNumber(chartTooltip.value)} CTe
-                            </text>
-                            <text x={Math.min(Math.max(chartTooltip.x - 70, 70), 800)} y={Math.max(chartTooltip.y - 15, 71)} className="fill-slate-200 text-[11px] font-medium">
-                              {chartTooltip.percent.toFixed(1).replace('.', ',')}% do total
-                            </text>
-                          </g>
+                          (() => {
+                            const tooltipWidth = 210;
+                            const tooltipHeight = 72;
+                            const tooltipX = Math.min(Math.max(chartTooltip.x - tooltipWidth / 2, 62), 940 - tooltipWidth);
+                            const tooltipY = Math.min(Math.max(chartTooltip.y - tooltipHeight - 14, 12), 272 - tooltipHeight);
+                            const textX = tooltipX + 14;
+
+                            return (
+                              <g pointerEvents="none">
+                                <rect
+                                  x={tooltipX}
+                                  y={tooltipY}
+                                  width={tooltipWidth}
+                                  height={tooltipHeight}
+                                  rx="8"
+                                  fill="#0f172a"
+                                  opacity="0.96"
+                                />
+                                <text x={textX} y={tooltipY + 24} className="fill-white text-[12px] font-bold">
+                                  {chartTooltip.mes} - {chartTooltip.label}
+                                </text>
+                                <text x={textX} y={tooltipY + 44} className="fill-slate-200 text-[11px] font-medium">
+                                  {formatNumber(chartTooltip.value)} CTe
+                                </text>
+                                <text x={textX} y={tooltipY + 60} className="fill-slate-200 text-[11px] font-medium">
+                                  {chartTooltip.percent.toFixed(1).replace('.', ',')}% do total do mes
+                                </text>
+                              </g>
+                            );
+                          })()
                         )}
                       </>
                     );
