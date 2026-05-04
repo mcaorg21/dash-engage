@@ -83,6 +83,14 @@ const QivezPainelView = () => {
   const [rows, setRows] = useState<import('../utils/api').QivezDashboardMonth[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [chartTooltip, setChartTooltip] = useState<{
+    x: number;
+    y: number;
+    mes: string;
+    label: string;
+    value: number;
+    percent: number;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -187,9 +195,9 @@ const QivezPainelView = () => {
                     const groupStart = (index: number) => 56 + index * groupWidth + groupWidth / 2;
                     const yFor = (value: number) => 272 - (value / maxValue) * chartHeight;
                     const series = [
-                      { key: 'total' as const, color: 'var(--engage-blue-600)', offset: -barWidth - 2 },
-                      { key: 'total_true' as const, color: '#10b981', offset: 0 },
-                      { key: 'total_false' as const, color: '#f43f5e', offset: barWidth + 2 },
+                      { key: 'total' as const, label: 'Total', color: 'var(--engage-blue-600)', offset: -barWidth - 2 },
+                      { key: 'total_true' as const, label: 'Conciliados', color: '#10b981', offset: 0 },
+                      { key: 'total_false' as const, label: 'Pendentes', color: '#f43f5e', offset: barWidth + 2 },
                     ];
 
                     return (
@@ -198,16 +206,30 @@ const QivezPainelView = () => {
                           <g key={String(row.mes)}>
                             {series.map(item => {
                               const value = Number(row[item.key] || 0);
+                              const total = Number(row.total || 0);
+                              const percent = item.key === 'total' ? 100 : (total ? (value / total) * 100 : 0);
                               const height = (value / maxValue) * chartHeight;
+                              const x = groupStart(index) + item.offset - barWidth / 2;
+                              const y = yFor(value);
                               return (
                                 <rect
                                   key={item.key}
-                                  x={groupStart(index) + item.offset - barWidth / 2}
-                                  y={yFor(value)}
+                                  x={x}
+                                  y={y}
                                   width={barWidth}
                                   height={Math.max(height, value > 0 ? 3 : 0)}
                                   rx="4"
                                   fill={item.color}
+                                  className="cursor-pointer transition-opacity hover:opacity-80"
+                                  onMouseEnter={() => setChartTooltip({
+                                    x: x + barWidth / 2,
+                                    y,
+                                    mes: formatMonthPt(row.mes),
+                                    label: item.label,
+                                    value,
+                                    percent,
+                                  })}
+                                  onMouseLeave={() => setChartTooltip(null)}
                                 />
                               );
                             })}
@@ -216,6 +238,28 @@ const QivezPainelView = () => {
                             </text>
                           </g>
                         ))}
+                        {chartTooltip && (
+                          <g pointerEvents="none">
+                            <rect
+                              x={Math.min(Math.max(chartTooltip.x - 82, 58), 788)}
+                              y={Math.max(chartTooltip.y - 74, 12)}
+                              width="150"
+                              height="58"
+                              rx="8"
+                              fill="#0f172a"
+                              opacity="0.94"
+                            />
+                            <text x={Math.min(Math.max(chartTooltip.x - 70, 70), 800)} y={Math.max(chartTooltip.y - 51, 35)} className="fill-white text-[11px] font-bold">
+                              {chartTooltip.mes} - {chartTooltip.label}
+                            </text>
+                            <text x={Math.min(Math.max(chartTooltip.x - 70, 70), 800)} y={Math.max(chartTooltip.y - 31, 55)} className="fill-slate-200 text-[11px] font-medium">
+                              {formatNumber(chartTooltip.value)} CTe
+                            </text>
+                            <text x={Math.min(Math.max(chartTooltip.x - 70, 70), 800)} y={Math.max(chartTooltip.y - 15, 71)} className="fill-slate-200 text-[11px] font-medium">
+                              {chartTooltip.percent.toFixed(1).replace('.', ',')}% do total
+                            </text>
+                          </g>
+                        )}
                       </>
                     );
                   })()}
