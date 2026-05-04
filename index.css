@@ -1,1 +1,9 @@
 @import "tailwindcss";
+
+:root {
+  --engage-blue-400: #1B90EF;
+  --engage-blue-500: #1F61EB;
+  --engage-blue-600: #1B70E7;
+  --engage-blue-800: #0951B1;
+  --engage-white: #FFFFFF;
+}

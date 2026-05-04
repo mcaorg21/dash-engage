@@ -154,7 +154,7 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="animate-spin text-slate-400" size={32} />
+        <Loader2 className="animate-spin text-[var(--engage-blue-500)]" size={32} />
       </div>
     );
   }
@@ -164,55 +164,55 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-            <Users className="text-slate-400" /> Controle de Usuarios
+            <Users className="text-[var(--engage-blue-500)]" /> Controle de Usuarios
           </h1>
           <p className="mt-1 text-sm text-slate-500">Gerencie usuarios, administradores e permissoes.</p>
         </div>
         {savedMessage && (
-          <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-600">
+          <div className="flex items-center gap-2 rounded-lg bg-[var(--engage-blue-400)]/10 px-4 py-2 text-sm font-bold text-[var(--engage-blue-800)]">
             <Check size={16} /> Alteracoes salvas
           </div>
         )}
       </div>
 
-      <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+      <div className="rounded-xl border border-slate-100 bg-[var(--engage-white)] p-6 shadow-sm">
         <form onSubmit={handleAddUser} className="mb-8 flex flex-col items-end gap-4 md:flex-row">
           <div className="w-full flex-1">
-            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-400">Adicionar usuario</label>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-[var(--engage-blue-800)]">Adicionar usuario</label>
             <input
               type="email"
               required
               placeholder="email@empresa.com"
-              className="w-full rounded-lg border border-slate-200 px-4 py-2.5 focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-lg border border-slate-200 px-4 py-2.5 transition-colors focus:border-[var(--engage-blue-400)] focus:outline-none focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
               value={newUserEmail}
               onChange={e => setNewUserEmail(e.target.value)}
             />
           </div>
           <div className="w-full flex-1">
-            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-400">Senha inicial</label>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-[var(--engage-blue-800)]">Senha inicial</label>
             <input
               type="text"
               required
               placeholder="Minimo 4 caracteres"
-              className="w-full rounded-lg border border-slate-200 px-4 py-2.5 focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-lg border border-slate-200 px-4 py-2.5 transition-colors focus:border-[var(--engage-blue-400)] focus:outline-none focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
               value={newUserPassword}
               onChange={e => setNewUserPassword(e.target.value)}
             />
           </div>
-          <button type="submit" disabled={isSaving} className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-6 py-2.5 font-bold text-white transition-colors hover:bg-slate-800 disabled:opacity-70 md:w-auto">
+          <button type="submit" disabled={isSaving} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--engage-blue-600)] px-6 py-2.5 font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)] disabled:opacity-70 md:w-auto">
             {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
             {isSaving ? 'Adicionando...' : 'Adicionar'}
           </button>
         </form>
 
         <div className="relative mb-4">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--engage-blue-500)]" />
           <input
             type="text"
             placeholder="Buscar por e-mail..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm focus:border-slate-400 focus:outline-none"
+            className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm transition-colors focus:border-[var(--engage-blue-400)] focus:outline-none focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
           />
         </div>
 
@@ -230,26 +230,26 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
               {filteredUsers.map(user => (
                 <tr key={user.email} className="transition-colors hover:bg-slate-50/50">
                   <td className="flex items-center gap-2 py-4 font-medium text-slate-700">
-                    {user.isAdmin && <Shield size={14} className="text-amber-500" title="Administrador" />}
+                    {user.isAdmin && <Shield size={14} className="text-[var(--engage-blue-500)]" title="Administrador" />}
                     {user.email}
                   </td>
                   <td className="py-4 text-center">
                     <button
                       onClick={() => handleToggleAdmin(user.email)}
                       disabled={PROTECTED_EMAILS.includes(user.email) || user.email === currentUser}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${user.isAdmin ? 'bg-amber-500' : 'bg-slate-200'} ${(PROTECTED_EMAILS.includes(user.email) || user.email === currentUser) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${user.isAdmin ? 'bg-[var(--engage-blue-500)]' : 'bg-slate-200'} ${(PROTECTED_EMAILS.includes(user.email) || user.email === currentUser) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${user.isAdmin ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </td>
                   <td className="py-4 text-center">
-                    <button onClick={() => setSelectedUserForPermissions(user.email)} className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-200">
+                    <button onClick={() => setSelectedUserForPermissions(user.email)} className="inline-flex items-center gap-2 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20">
                       <Settings2 size={14} />
                       Gerenciar
                     </button>
                   </td>
                   <td className="flex items-center justify-end gap-1 py-4 text-right">
-                    <button onClick={() => { setResetPasswordTarget(user.email); setNewPasswordValue(''); }} className="inline-flex rounded-lg p-2 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600" title="Redefinir senha">
+                    <button onClick={() => { setResetPasswordTarget(user.email); setNewPasswordValue(''); }} className="inline-flex rounded-lg p-2 text-slate-400 transition-colors hover:bg-[var(--engage-blue-400)]/10 hover:text-[var(--engage-blue-500)]" title="Redefinir senha">
                       <Key size={18} />
                     </button>
                     {!PROTECTED_EMAILS.includes(user.email) && user.email !== currentUser && (
@@ -266,7 +266,7 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
       </div>
 
       {selectedUserForPermissions && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--engage-blue-800)]/60 p-4 backdrop-blur-sm">
           <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-xl">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 p-6">
               <div>
@@ -280,9 +280,9 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
 
             <div className="flex-1 space-y-6 overflow-y-auto p-6">
               {selectedUser.isAdmin && (
-                <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <Shield className="mt-0.5 shrink-0 text-amber-500" size={20} />
-                  <p className="text-sm font-medium text-amber-800">
+                <div className="mb-4 flex items-start gap-3 rounded-lg border border-[var(--engage-blue-400)]/30 bg-[var(--engage-blue-400)]/10 p-4">
+                  <Shield className="mt-0.5 shrink-0 text-[var(--engage-blue-500)]" size={20} />
+                  <p className="text-sm font-medium text-[var(--engage-blue-800)]">
                     Este usuario e administrador e possui acesso total.
                   </p>
                 </div>
@@ -304,7 +304,7 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
                             onChange={() => togglePermission(selectedUser.email, item.id)}
                             className="peer sr-only"
                           />
-                          <div className="h-5 w-9 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-disabled:opacity-50"></div>
+                          <div className="h-5 w-9 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-[var(--engage-blue-500)] peer-checked:after:translate-x-full peer-checked:after:border-white peer-disabled:opacity-50"></div>
                         </div>
                         <span className={`text-sm font-medium transition-colors ${selectedUser.isAdmin ? 'text-slate-500' : 'text-slate-600 group-hover:text-slate-900'}`}>
                           {item.label}
@@ -317,7 +317,7 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
             </div>
 
             <div className="flex shrink-0 justify-end border-t border-slate-100 bg-slate-50 p-6">
-              <button onClick={() => setSelectedUserForPermissions(null)} className="rounded-lg bg-slate-900 px-6 py-2.5 font-bold text-white transition-colors hover:bg-slate-800">
+              <button onClick={() => setSelectedUserForPermissions(null)} className="rounded-lg bg-[var(--engage-blue-600)] px-6 py-2.5 font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
                 Concluido
               </button>
             </div>
@@ -326,7 +326,7 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
       )}
 
       {resetPasswordTarget && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--engage-blue-800)]/60 p-4 backdrop-blur-sm">
           <div className="flex w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 p-6">
               <div>
@@ -343,7 +343,7 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
                 <input
                   type="text"
                   placeholder="Digite a nova senha"
-                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 focus:border-slate-400 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 transition-colors focus:border-[var(--engage-blue-400)] focus:outline-none focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
                   value={newPasswordValue}
                   onChange={e => setNewPasswordValue(e.target.value)}
                 />
@@ -353,7 +353,7 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
               <button onClick={() => setResetPasswordTarget(null)} className="rounded-lg px-4 py-2 font-medium text-slate-600 transition-colors hover:bg-slate-200">
                 Cancelar
               </button>
-              <button onClick={handleResetPassword} disabled={isResettingPassword || !newPasswordValue} className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-70">
+              <button onClick={handleResetPassword} disabled={isResettingPassword || !newPasswordValue} className="flex items-center gap-2 rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 font-medium text-white transition-colors hover:bg-[var(--engage-blue-500)] disabled:opacity-70">
                 {isResettingPassword && <Loader2 size={14} className="animate-spin" />}
                 Salvar
               </button>
@@ -363,7 +363,7 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
       )}
 
       {confirmAction && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--engage-blue-800)]/60 p-4 backdrop-blur-sm">
           <div className="flex w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl">
             <div className="p-6">
               <h3 className="mb-2 text-lg font-bold text-slate-800">Confirmacao</h3>
@@ -382,14 +382,14 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
       )}
 
       {alertMessage && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--engage-blue-800)]/60 p-4 backdrop-blur-sm">
           <div className="flex w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl">
             <div className="p-6">
               <h3 className="mb-2 text-lg font-bold text-slate-800">Aviso</h3>
               <p className="whitespace-pre-wrap text-sm text-slate-600">{alertMessage}</p>
             </div>
             <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-4">
-              <button onClick={() => setAlertMessage(null)} className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white transition-colors hover:bg-slate-800">
+              <button onClick={() => setAlertMessage(null)} className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 font-medium text-white transition-colors hover:bg-[var(--engage-blue-500)]">
                 OK
               </button>
             </div>
