@@ -163,32 +163,63 @@ const QivezPainelView = () => {
             {rows.length === 0 ? (
               <div className="py-12 text-sm font-medium text-slate-500">Nenhum dado encontrado.</div>
             ) : (
-              <div className="space-y-4">
-                {rows.map(row => {
-                  const total = Number(row.total || 0);
-                  const totalTrue = Number(row.total_true || 0);
-                  const totalFalse = Number(row.total_false || 0);
+              <div className="overflow-x-auto">
+                <svg viewBox="0 0 980 360" className="min-w-[760px]">
+                  {[0, 1, 2, 3, 4].map(step => {
+                    const y = 40 + step * 58;
+                    const value = Math.round(maxValue - (maxValue / 4) * step);
 
-                  return (
-                    <div key={String(row.mes)} className="grid gap-3 lg:grid-cols-[90px_1fr_90px] lg:items-center">
-                      <div className="text-sm font-bold text-slate-700">{formatMonthPt(row.mes)}</div>
-                      <div className="space-y-1.5">
-                        <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-[var(--engage-blue-600)]" style={{ width: `${Math.max((total / maxValue) * 100, 2)}%` }} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${total ? (totalTrue / total) * 100 : 0}%` }} />
-                          </div>
-                          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full bg-rose-500" style={{ width: `${total ? (totalFalse / total) * 100 : 0}%` }} />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right text-sm font-bold text-slate-900">{formatNumber(total)}</div>
-                    </div>
-                  );
-                })}
+                    return (
+                      <g key={step}>
+                        <line x1="56" y1={y} x2="940" y2={y} stroke="#e2e8f0" strokeWidth="1" />
+                        <text x="44" y={y + 4} textAnchor="end" className="fill-slate-400 text-[11px] font-bold">
+                          {formatNumber(value)}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {(() => {
+                    const chartWidth = 884;
+                    const chartHeight = 232;
+                    const groupWidth = chartWidth / rows.length;
+                    const barWidth = Math.max(Math.min(groupWidth / 5, 18), 7);
+                    const groupStart = (index: number) => 56 + index * groupWidth + groupWidth / 2;
+                    const yFor = (value: number) => 272 - (value / maxValue) * chartHeight;
+                    const series = [
+                      { key: 'total' as const, color: 'var(--engage-blue-600)', offset: -barWidth - 2 },
+                      { key: 'total_true' as const, color: '#10b981', offset: 0 },
+                      { key: 'total_false' as const, color: '#f43f5e', offset: barWidth + 2 },
+                    ];
+
+                    return (
+                      <>
+                        {rows.map((row, index) => (
+                          <g key={String(row.mes)}>
+                            {series.map(item => {
+                              const value = Number(row[item.key] || 0);
+                              const height = (value / maxValue) * chartHeight;
+                              return (
+                                <rect
+                                  key={item.key}
+                                  x={groupStart(index) + item.offset - barWidth / 2}
+                                  y={yFor(value)}
+                                  width={barWidth}
+                                  height={Math.max(height, value > 0 ? 3 : 0)}
+                                  rx="4"
+                                  fill={item.color}
+                                />
+                              );
+                            })}
+                            <text x={groupStart(index)} y="318" textAnchor="middle" className="fill-slate-500 text-[11px] font-bold">
+                              {formatMonthPt(row.mes)}
+                            </text>
+                          </g>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </svg>
               </div>
             )}
           </div>
