@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { api } from '../utils/api';
 
+const LOGIN_LOGO_SRC = '/logo/white-logo.7e189ed.webp';
+
 const LoginView = ({ onLogin }: { onLogin: (email: string, token: string) => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showLogoFallback, setShowLogoFallback] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,8 +33,17 @@ const LoginView = ({ onLogin }: { onLogin: (email: string, token: string) => voi
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--engage-blue-800)] px-4">
       <div className="z-10 w-full max-w-md rounded-xl border border-white/80 bg-[var(--engage-white)] p-10 shadow-2xl">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">Dash Engage</h1>
+        <div className="mb-8 flex flex-col items-center text-center">
+          {showLogoFallback ? (
+            <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">Dash Engage</h1>
+          ) : (
+            <img
+              src={LOGIN_LOGO_SRC}
+              alt="Dash Engage"
+              className="h-12 max-w-56 object-contain"
+              onError={() => setShowLogoFallback(true)}
+            />
+          )}
           <p className="mt-1 text-sm font-medium text-slate-500">Area restrita</p>
         </div>
 
