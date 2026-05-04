@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
     "build": "vite build",
     "preview": "vite preview",
     "server": "node --env-file-if-exists=.env.local --import tsx server/index.ts",
     "seed": "node --env-file-if-exists=.env.local --import tsx server/seed.ts",
-    "start": "concurrently \"npm run server\" \"npm run dev\"",
-    "start:prod": "NODE_ENV=production tsx server/index.ts",
-    "build:prod": "vite build && NODE_ENV=production tsx server/index.ts"
+    "start": "node --import tsx server/index.ts",
+    "start:prod": "node --import tsx server/index.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

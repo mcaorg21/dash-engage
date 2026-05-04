@@ -8,7 +8,7 @@ import usersRoutes from './routes/users.js';
 import qivezRoutes from './routes/qivez.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const isProd = process.env.NODE_ENV === 'production';
+const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.RAILWAY_ENVIRONMENT_NAME);
 
 const app = express();
 
