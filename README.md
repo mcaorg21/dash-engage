@@ -18,9 +18,9 @@ npm install
 npm run start
 ```
 
-Frontend: `http://localhost:3041`
+Frontend: `http://localhost:3141`
 
-Backend: `http://localhost:3040`
+Backend: `http://localhost:3140`
 
 ## Banco e primeiro admin
 
