@@ -116,7 +116,8 @@ const jsonToXmlNode = (key: string, value: unknown): string => {
 const jsonToXmlDocument = (value: unknown) => {
   if (!value || typeof value !== 'object') return String(value ?? '');
 
-  const entries = Object.entries(value as Record<string, unknown>);
+  const record = value as Record<string, unknown>;
+  const entries = record.CTe ? [['CTe', record.CTe] as [string, unknown]] : Object.entries(record);
   const body = entries.map(([key, childValue]) => jsonToXmlNode(key, childValue)).join('');
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n${body}`;
