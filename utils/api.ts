@@ -37,6 +37,13 @@ export interface LoginResponse {
 
 export type QivezLancamento = Record<string, unknown>;
 
+export interface QivezDashboardMonth {
+  mes: string;
+  total: number;
+  total_true: number;
+  total_false: number;
+}
+
 export const api = {
   login: (email: string, password: string) =>
     request<LoginResponse>('/auth/login', {
@@ -85,4 +92,6 @@ export const api = {
     const query = params.toString();
     return request<QivezLancamento[]>(`/qivez/lancamentos${query ? `?${query}` : ''}`);
   },
+
+  getQivezDashboard: () => request<QivezDashboardMonth[]>('/qivez/dashboard'),
 };

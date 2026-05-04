@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import JSZip from 'jszip';
-import { ChevronDown, ChevronRight, Download, FileText, LayoutDashboard, List, LogOut, Menu, RefreshCw, Upload, Users, X } from 'lucide-react';
+import { BarChart3, CheckCircle2, ChevronDown, ChevronRight, Download, FileText, LayoutDashboard, List, LogOut, Menu, RefreshCw, Upload, Users, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import { api } from '../utils/api';
 
@@ -43,6 +43,157 @@ const QivezPlaceholderView = ({ tab }: { tab: string }) => {
           <span className="text-sm font-medium">Area criada. Conteudo do modulo sera implementado aqui.</span>
         </div>
       </div>
+    </div>
+  );
+};
+
+const formatMonthPt = (value: unknown) => {
+  if (!value) return '-';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return formatCellValue(value);
+
+  return date.toLocaleDateString('pt-BR', {
+    month: 'short',
+    year: '2-digit',
+    timeZone: 'UTC',
+  }).replace('.', '');
+};
+
+const formatNumber = (value: unknown) => {
+  const amount = Number(value);
+  if (Number.isNaN(amount)) return '0';
+  return amount.toLocaleString('pt-BR');
+};
+
+const DashboardCard = ({ title, value, icon: Icon, tone }: { title: string; value: unknown; icon: React.ElementType; tone: string }) => (
+  <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <div className="text-xs font-bold uppercase tracking-widest text-slate-400">{title}</div>
+        <div className="mt-2 text-3xl font-bold text-slate-900">{formatNumber(value)}</div>
+      </div>
+      <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${tone}`}>
+        <Icon size={24} />
+      </div>
+    </div>
+  </div>
+);
+
+const QivezPainelView = () => {
+  const [rows, setRows] = useState<import('../utils/api').QivezDashboardMonth[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDashboard = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const data = await api.getQivezDashboard();
+        if (!cancelled) setRows(data);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Erro ao carregar painel.');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const totals = rows.reduce(
+    (acc, row) => ({
+      total: acc.total + Number(row.total || 0),
+      totalTrue: acc.totalTrue + Number(row.total_true || 0),
+      totalFalse: acc.totalFalse + Number(row.total_false || 0),
+    }),
+    { total: 0, totalTrue: 0, totalFalse: 0 }
+  );
+  const maxValue = Math.max(...rows.map(row => Number(row.total || 0)), 1);
+  const lastMonth = rows[rows.length - 1];
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">CTe - Painel</h1>
+        <p className="mt-1 text-sm text-slate-500">Acompanhamento temporal dos CTe conciliados e pendentes.</p>
+      </div>
+
+      {isLoading && (
+        <div className="rounded-xl border border-slate-100 bg-white p-8 text-sm font-medium text-slate-500 shadow-sm">
+          Carregando painel...
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl border border-red-100 bg-white p-8 text-sm font-medium text-red-600 shadow-sm">
+          {error}
+        </div>
+      )}
+
+      {!isLoading && !error && (
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <DashboardCard title="Total CTe" value={totals.total} icon={BarChart3} tone="bg-[var(--engage-blue-400)]/10 text-[var(--engage-blue-800)]" />
+            <DashboardCard title="Conciliados" value={totals.totalTrue} icon={CheckCircle2} tone="bg-emerald-50 text-emerald-600" />
+            <DashboardCard title="Pendentes" value={totals.totalFalse} icon={XCircle} tone="bg-rose-50 text-rose-600" />
+            <DashboardCard title="Ultimo mes" value={lastMonth?.total ?? 0} icon={RefreshCw} tone="bg-[var(--engage-blue-500)]/10 text-[var(--engage-blue-500)]" />
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+            <div className="mb-6 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Evolucao mensal</h2>
+                <p className="text-sm text-slate-500">Total, conciliados e pendentes por mes de lancamento.</p>
+              </div>
+              <div className="flex flex-wrap gap-3 text-xs font-bold text-slate-500">
+                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[var(--engage-blue-600)]" /> Total</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Conciliados</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> Pendentes</span>
+              </div>
+            </div>
+
+            {rows.length === 0 ? (
+              <div className="py-12 text-sm font-medium text-slate-500">Nenhum dado encontrado.</div>
+            ) : (
+              <div className="space-y-4">
+                {rows.map(row => {
+                  const total = Number(row.total || 0);
+                  const totalTrue = Number(row.total_true || 0);
+                  const totalFalse = Number(row.total_false || 0);
+
+                  return (
+                    <div key={String(row.mes)} className="grid gap-3 lg:grid-cols-[90px_1fr_90px] lg:items-center">
+                      <div className="text-sm font-bold text-slate-700">{formatMonthPt(row.mes)}</div>
+                      <div className="space-y-1.5">
+                        <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full bg-[var(--engage-blue-600)]" style={{ width: `${Math.max((total / maxValue) * 100, 2)}%` }} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${total ? (totalTrue / total) * 100 : 0}%` }} />
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-rose-500" style={{ width: `${total ? (totalFalse / total) * 100 : 0}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm font-bold text-slate-900">{formatNumber(total)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -522,7 +673,11 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
             <QivezListarView />
           )}
 
-          {activeTab !== 'conciliacao_qivez_listar' && qivezTabs.some(tab => tab.id === activeTab) && hasPermission(activeTab) && (
+          {activeTab === 'conciliacao_qivez_painel' && hasPermission('conciliacao_qivez_painel') && (
+            <QivezPainelView />
+          )}
+
+          {activeTab !== 'conciliacao_qivez_listar' && activeTab !== 'conciliacao_qivez_painel' && qivezTabs.some(tab => tab.id === activeTab) && hasPermission(activeTab) && (
             <QivezPlaceholderView tab={activeTab} />
           )}
         </div>

@@ -18,6 +18,32 @@ async function hasPermission(req: AuthRequest, permission: string) {
 
 router.use(authenticate);
 
+router.get('/dashboard', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_qivez_painel');
+    if (!allowed) {
+      res.status(403).json({ error: 'Acesso negado' });
+      return;
+    }
+
+    const result = await pool.query(`
+      SELECT
+          DATE_TRUNC('month', data_lancamento) AS mes,
+          COUNT(DISTINCT chave_cte)::int AS total,
+          COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = true)::int  AS total_true,
+          COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = false)::int AS total_false
+      FROM lancamentos_financeiros
+      GROUP BY 1
+      ORDER BY 1
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Qivez dashboard error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 router.get('/lancamentos', async (req: AuthRequest, res) => {
   try {
     const allowed = await hasPermission(req, 'conciliacao_qivez_listar');
