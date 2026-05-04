@@ -3,12 +3,15 @@ import { LayoutDashboard, LogOut, Menu, RefreshCw, Users, X } from 'lucide-react
 import UserManagementView from './UserManagementView';
 import { api } from '../utils/api';
 
+const INTERNAL_LOGO_SRC = '/logo/logo_white.webp';
+
 const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [showLogoFallback, setShowLogoFallback] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,9 +56,20 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
 
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-slate-900 text-white transition-transform duration-300 md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between border-b border-slate-800/50 p-6">
-          <div>
-            <div className="text-lg font-bold">Dash Engage</div>
-            <div className="text-xs font-medium text-slate-400">Area restrita</div>
+          <div className="min-w-0">
+            {showLogoFallback ? (
+              <>
+                <div className="text-lg font-bold">Dash Engage</div>
+                <div className="text-xs font-medium text-slate-400">Area restrita</div>
+              </>
+            ) : (
+              <img
+                src={INTERNAL_LOGO_SRC}
+                alt="Dash Engage"
+                className="h-10 max-w-44 object-contain"
+                onError={() => setShowLogoFallback(true)}
+              />
+            )}
           </div>
           <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
             <X size={22} />
