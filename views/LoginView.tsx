@@ -31,11 +31,17 @@ const LoginView = ({ onLogin }: { onLogin: (email: string, token: string) => voi
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--engage-white)] px-4">
-      <div className="z-10 w-full max-w-md rounded-xl border border-[var(--engage-blue-400)]/20 bg-[var(--engage-blue-800)] p-10 shadow-2xl shadow-[var(--engage-blue-800)]/20">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#061a5a] px-4">
+      <div className="absolute left-1/2 top-1/2 h-[680px] w-[680px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1b4fd3]/70 blur-3xl" />
+      <div className="absolute -left-32 top-12 h-[520px] w-[520px] rounded-full bg-[#7a1fa2]/70 blur-3xl" />
+      <div className="absolute -bottom-40 right-[-120px] h-[560px] w-[560px] rounded-full bg-[#c2185b]/60 blur-3xl" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.08),rgba(6,26,90,0.25)_42%,rgba(3,12,40,0.82)_100%)]" />
+      <div className="absolute inset-0 opacity-[0.08] [background-image:radial-gradient(rgba(255,255,255,0.7)_1px,transparent_1px)] [background-size:4px_4px]" />
+
+      <div className="z-10 w-full max-w-md rounded-xl border border-white/15 bg-white/95 p-10 shadow-2xl shadow-black/25 backdrop-blur-md">
         <div className="mb-8 flex flex-col items-center text-center">
           {showLogoFallback ? (
-            <h1 className="text-2xl font-bold text-white">Dash Engage</h1>
+            <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">Dash Engage</h1>
           ) : (
             <img
               src={LOGIN_LOGO_SRC}
@@ -44,12 +50,12 @@ const LoginView = ({ onLogin }: { onLogin: (email: string, token: string) => voi
               onError={() => setShowLogoFallback(true)}
             />
           )}
-          <p className="mt-1 text-sm font-medium text-white/75">Area restrita</p>
+          <p className="mt-1 text-sm font-medium text-slate-500">Area restrita</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-widest text-white/85">E-mail</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-[var(--engage-blue-800)]">E-mail</label>
             <input
               type="email"
               required
@@ -62,8 +68,8 @@ const LoginView = ({ onLogin }: { onLogin: (email: string, token: string) => voi
 
           <div className="space-y-1">
             <div className="flex items-center justify-between gap-3">
-              <label className="text-xs font-bold uppercase tracking-widest text-white/85">Senha</label>
-              <span className="text-right text-[10px] font-bold uppercase text-white/60">
+              <label className="text-xs font-bold uppercase tracking-widest text-[var(--engage-blue-800)]">Senha</label>
+              <span className="text-right text-[10px] font-bold uppercase text-slate-400">
                 Fale com o administrador.
               </span>
             </div>
@@ -77,12 +83,12 @@ const LoginView = ({ onLogin }: { onLogin: (email: string, token: string) => voi
             />
           </div>
 
-          {error && <div className="rounded-lg bg-white p-3 text-sm font-medium text-red-600">{error}</div>}
+          {error && <div className="rounded-lg bg-red-50 p-3 text-sm font-medium text-red-600">{error}</div>}
 
           <button
             type="submit"
             disabled={isLoading}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-white py-3 font-bold text-[var(--engage-blue-800)] shadow-lg shadow-black/10 transition-colors hover:bg-slate-100 disabled:opacity-70"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--engage-blue-600)] py-3 font-bold text-white shadow-lg shadow-[var(--engage-blue-800)]/20 transition-colors hover:bg-[var(--engage-blue-500)] disabled:opacity-70"
           >
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : 'Entrar'}
           </button>
