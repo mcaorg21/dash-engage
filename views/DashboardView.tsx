@@ -1,13 +1,55 @@
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, LogOut, Menu, RefreshCw, Users, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, LayoutDashboard, List, LogOut, Menu, RefreshCw, Upload, Users, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import { api } from '../utils/api';
 
 const INTERNAL_LOGO_SRC = '/logo/white-logo.7e189ed.webp';
 
+const qivezTabs = [
+  { id: 'conciliacao_qivez_painel', label: 'Painel', icon: LayoutDashboard },
+  { id: 'conciliacao_qivez_listar', label: 'Listar', icon: List },
+  { id: 'conciliacao_qivez_importar', label: 'Importar', icon: Upload },
+];
+
+const qivezTitles: Record<string, { title: string; description: string }> = {
+  conciliacao_qivez_painel: {
+    title: 'Qivez - Painel',
+    description: 'Resumo operacional da conciliacao Qivez.',
+  },
+  conciliacao_qivez_listar: {
+    title: 'Qivez - Listar',
+    description: 'Listagem de registros da conciliacao Qivez.',
+  },
+  conciliacao_qivez_importar: {
+    title: 'Qivez - Importar',
+    description: 'Importacao de dados para a conciliacao Qivez.',
+  },
+};
+
+const QivezPlaceholderView = ({ tab }: { tab: string }) => {
+  const content = qivezTitles[tab];
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">{content.title}</h1>
+        <p className="mt-1 text-sm text-slate-500">{content.description}</p>
+      </div>
+
+      <div className="rounded-xl border border-slate-100 bg-white p-8 shadow-sm">
+        <div className="flex items-center gap-3 text-slate-500">
+          <FileText className="text-[var(--engage-blue-500)]" size={22} />
+          <span className="text-sm font-medium">Area criada. Conteudo do modulo sera implementado aqui.</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isQivezOpen, setIsQivezOpen] = useState(false);
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -39,6 +81,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
   }, [onLogout]);
 
   const hasPermission = (id: string) => isAdmin || userPermissions.includes(id);
+  const hasAnyQivezPermission = qivezTabs.some(tab => hasPermission(tab.id));
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -89,6 +132,42 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
           >
             <LayoutDashboard size={18} /> Inicio
           </button>
+
+          {hasAnyQivezPermission && (
+            <>
+              <div className="px-4 pb-2 pt-5 text-[10px] font-bold uppercase tracking-widest text-white/50">
+                Conciliacao
+              </div>
+              <button
+                onClick={() => setIsQivezOpen(!isQivezOpen)}
+                className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${qivezTabs.some(tab => tab.id === activeTab) ? 'bg-white/15 text-white ring-1 ring-white/15' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+              >
+                <span className="flex items-center gap-3">
+                  <FileText size={18} /> Qivez
+                </span>
+                {isQivezOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </button>
+
+              {isQivezOpen && (
+                <div className="space-y-1 pl-4">
+                  {qivezTabs.map(tab => {
+                    if (!hasPermission(tab.id)) return null;
+                    const Icon = tab.icon;
+
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => handleTabChange(tab.id)}
+                        className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                      >
+                        <Icon size={16} /> {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
 
           {hasPermission('usuarios') && (
             <>
@@ -143,6 +222,10 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
             <div className="mx-auto max-w-7xl">
               <UserManagementView currentUser={user} />
             </div>
+          )}
+
+          {qivezTabs.some(tab => tab.id === activeTab) && hasPermission(activeTab) && (
+            <QivezPlaceholderView tab={activeTab} />
           )}
         </div>
       </main>

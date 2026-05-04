@@ -3,6 +3,9 @@ import { Check, Key, Loader2, Plus, Search, Settings2, Shield, Trash2, Users, X 
 import { api } from '../utils/api';
 
 const MENU_ITEMS = [
+  { id: 'conciliacao_qivez_painel', label: 'Painel', group: 'Conciliacao / Qivez' },
+  { id: 'conciliacao_qivez_listar', label: 'Listar', group: 'Conciliacao / Qivez' },
+  { id: 'conciliacao_qivez_importar', label: 'Importar', group: 'Conciliacao / Qivez' },
   { id: 'usuarios', label: 'Controle de Usuarios', group: 'Administracao' },
 ];
 
