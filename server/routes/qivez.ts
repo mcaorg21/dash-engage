@@ -31,7 +31,9 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
           DATE_TRUNC('month', data_lancamento) AS mes,
           COUNT(DISTINCT chave_cte)::int AS total,
           COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = true)::int  AS total_true,
-          COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = false)::int AS total_false
+          COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = false)::int AS total_false,
+          COALESCE(SUM(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false), 0)::float AS soma_false,
+          COALESCE(AVG(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false), 0)::float AS media_false
       FROM lancamentos_financeiros
       GROUP BY 1
       ORDER BY 1

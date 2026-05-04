@@ -65,12 +65,34 @@ const formatNumber = (value: unknown) => {
   return amount.toLocaleString('pt-BR');
 };
 
-const DashboardCard = ({ title, value, icon: Icon, tone }: { title: string; value: unknown; icon: React.ElementType; tone: string }) => (
+const DashboardCard = ({
+  title,
+  value,
+  icon: Icon,
+  tone,
+  details,
+}: {
+  title: string;
+  value: unknown;
+  icon: React.ElementType;
+  tone: string;
+  details?: { label: string; value: string }[];
+}) => (
   <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
     <div className="flex items-center justify-between gap-4">
       <div>
         <div className="text-xs font-bold uppercase tracking-widest text-slate-400">{title}</div>
         <div className="mt-2 text-3xl font-bold text-slate-900">{formatNumber(value)}</div>
+        {details && (
+          <div className="mt-3 space-y-1 text-xs font-semibold text-slate-500">
+            {details.map(detail => (
+              <div key={detail.label} className="flex flex-wrap gap-x-1">
+                <span>{detail.label}:</span>
+                <span className="text-slate-700">{detail.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${tone}`}>
         <Icon size={24} />
@@ -123,10 +145,14 @@ const QivezPainelView = () => {
       total: acc.total + Number(row.total || 0),
       totalTrue: acc.totalTrue + Number(row.total_true || 0),
       totalFalse: acc.totalFalse + Number(row.total_false || 0),
+      somaFalse: acc.somaFalse + Number(row.soma_false || 0),
+      mediaFalseBase: acc.mediaFalseBase + (Number(row.total_false || 0) * Number(row.media_false || 0)),
     }),
-    { total: 0, totalTrue: 0, totalFalse: 0 }
+    { total: 0, totalTrue: 0, totalFalse: 0, somaFalse: 0, mediaFalseBase: 0 }
   );
+  const mediaFalse = totals.totalFalse ? totals.mediaFalseBase / totals.totalFalse : 0;
   const maxValue = Math.max(...rows.map(row => Number(row.total || 0)), 1);
+  const maxPendingValue = Math.max(...rows.map(row => Number(row.total_false || 0)), 1);
   const lastMonth = rows[rows.length - 1];
 
   return (
@@ -153,7 +179,16 @@ const QivezPainelView = () => {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <DashboardCard title="Total CTe" value={totals.total} icon={BarChart3} tone="bg-[var(--engage-blue-400)]/10 text-[var(--engage-blue-800)]" />
             <DashboardCard title="Conciliados" value={totals.totalTrue} icon={CheckCircle2} tone="bg-emerald-50 text-emerald-600" />
-            <DashboardCard title="Pendentes" value={totals.totalFalse} icon={XCircle} tone="bg-rose-50 text-rose-600" />
+            <DashboardCard
+              title="Pendentes"
+              value={totals.totalFalse}
+              icon={XCircle}
+              tone="bg-rose-50 text-rose-600"
+              details={[
+                { label: 'Soma', value: formatCurrency(totals.somaFalse) },
+                { label: 'Media', value: formatCurrency(mediaFalse) },
+              ]}
+            />
             <DashboardCard title="Ultimo mes" value={lastMonth?.total ?? 0} icon={RefreshCw} tone="bg-[var(--engage-blue-500)]/10 text-[var(--engage-blue-500)]" />
           </div>
 
@@ -161,7 +196,7 @@ const QivezPainelView = () => {
             <div className="mb-6 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Evolucao mensal</h2>
-                <p className="text-sm text-slate-500">Total, conciliados e pendentes por mes de lancamento.</p>
+                <p className="text-sm text-slate-500">Total e conciliados em barras, pendentes em linha no eixo direito.</p>
               </div>
               <div className="flex flex-wrap gap-3 text-xs font-bold text-slate-500">
                 <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[var(--engage-blue-600)]" /> Total</span>
@@ -178,12 +213,16 @@ const QivezPainelView = () => {
                   {[0, 1, 2, 3, 4].map(step => {
                     const y = 40 + step * 58;
                     const value = Math.round(maxValue - (maxValue / 4) * step);
+                    const pendingValue = Math.round(maxPendingValue - (maxPendingValue / 4) * step);
 
                     return (
                       <g key={step}>
                         <line x1="56" y1={y} x2="940" y2={y} stroke="#e2e8f0" strokeWidth="1" />
                         <text x="44" y={y + 4} textAnchor="end" className="fill-slate-400 text-[11px] font-bold">
                           {formatNumber(value)}
+                        </text>
+                        <text x="952" y={y + 4} textAnchor="start" className="fill-rose-400 text-[11px] font-bold">
+                          {formatNumber(pendingValue)}
                         </text>
                       </g>
                     );
@@ -196,23 +235,46 @@ const QivezPainelView = () => {
                     const barWidth = Math.max(Math.min(groupWidth / 5, 18), 7);
                     const groupStart = (index: number) => 56 + index * groupWidth + groupWidth / 2;
                     const yFor = (value: number) => 272 - (value / maxValue) * chartHeight;
-                    const series = [
-                      { key: 'total' as const, label: 'Total', color: 'var(--engage-blue-600)', offset: -barWidth - 2 },
-                      { key: 'total_true' as const, label: 'Conciliados', color: '#10b981', offset: 0 },
-                      { key: 'total_false' as const, label: 'Pendentes', color: '#f43f5e', offset: barWidth + 2 },
+                    const yForPending = (value: number) => 272 - (value / maxPendingValue) * chartHeight;
+                    const barSeries = [
+                      { key: 'total' as const, label: 'Total', color: 'var(--engage-blue-600)', offset: -barWidth / 2 - 2 },
+                      { key: 'total_true' as const, label: 'Conciliados', color: '#10b981', offset: barWidth / 2 + 2 },
                     ];
+                    const points = rows.map((row, index) => ({
+                      row,
+                      x: groupStart(index),
+                      y: yForPending(Number(row.total_false || 0)),
+                      value: Number(row.total_false || 0),
+                      total: Number(row.total || 0),
+                    }));
+                    const linePath = points
+                      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+                      .join(' ');
+                    const areaPath = points.length
+                      ? `${linePath} L ${points[points.length - 1].x} 272 L ${points[0].x} 272 Z`
+                      : '';
 
                     return (
                       <>
+                        {areaPath && (
+                          <path d={areaPath} fill="url(#pendingAreaGradient)" opacity="0.16" />
+                        )}
+                        <defs>
+                          <linearGradient id="pendingAreaGradient" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0%" stopColor="#f43f5e" />
+                            <stop offset="100%" stopColor="#f43f5e" stopOpacity="0" />
+                          </linearGradient>
+                        </defs>
                         {rows.map((row, index) => (
-                          <g key={String(row.mes)}>
-                            {series.map(item => {
+                          <g key={`${row.mes}-bars`}>
+                            {barSeries.map(item => {
                               const value = Number(row[item.key] || 0);
                               const total = Number(row.total || 0);
                               const percent = item.key === 'total' ? 100 : (total ? (value / total) * 100 : 0);
                               const height = (value / maxValue) * chartHeight;
                               const x = groupStart(index) + item.offset - barWidth / 2;
                               const y = yFor(value);
+
                               return (
                                 <rect
                                   key={item.key}
@@ -261,8 +323,68 @@ const QivezPainelView = () => {
                                 />
                               );
                             })}
-                            <text x={groupStart(index)} y="318" textAnchor="middle" className="fill-slate-500 text-[11px] font-bold">
-                              {formatMonthPt(row.mes)}
+                          </g>
+                        ))}
+                        {linePath && (
+                          <path
+                            d={linePath}
+                            fill="none"
+                            stroke="#f43f5e"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="4"
+                          />
+                        )}
+                        {points.map((point, index) => (
+                          <g key={String(point.row.mes)}>
+                            <line x1={point.x} y1="40" x2={point.x} y2="272" stroke="#f1f5f9" strokeWidth="1" />
+                            <circle cx={point.x} cy={point.y} r="13" fill="#fff" opacity="0" />
+                            <circle
+                              cx={point.x}
+                              cy={point.y}
+                              r="6"
+                              fill="#fff"
+                              stroke="#f43f5e"
+                              strokeWidth="4"
+                              className="cursor-pointer transition-opacity hover:opacity-80"
+                              onMouseEnter={() => {
+                                if (isChartTooltipPinned) return;
+                                setChartTooltip({
+                                  x: point.x,
+                                  y: point.y,
+                                  mes: formatMonthPt(point.row.mes),
+                                  label: 'Pendentes',
+                                  value: point.value,
+                                  percent: point.total ? (point.value / point.total) * 100 : 0,
+                                  id: `${point.row.mes}-total_false`,
+                                });
+                              }}
+                              onMouseLeave={() => {
+                                if (!isChartTooltipPinned) setChartTooltip(null);
+                              }}
+                              onClick={() => {
+                                const nextTooltip = {
+                                  x: point.x,
+                                  y: point.y,
+                                  mes: formatMonthPt(point.row.mes),
+                                  label: 'Pendentes',
+                                  value: point.value,
+                                  percent: point.total ? (point.value / point.total) * 100 : 0,
+                                  id: `${point.row.mes}-total_false`,
+                                };
+
+                                if (isChartTooltipPinned && chartTooltip?.id === nextTooltip.id) {
+                                  setIsChartTooltipPinned(false);
+                                  setChartTooltip(null);
+                                  return;
+                                }
+
+                                setChartTooltip(nextTooltip);
+                                setIsChartTooltipPinned(true);
+                              }}
+                            />
+                            <text x={point.x} y="318" textAnchor="middle" className="fill-slate-500 text-[11px] font-bold">
+                              {formatMonthPt(point.row.mes)}
                             </text>
                           </g>
                         ))}
@@ -332,11 +454,13 @@ const formatDatePt = (value: unknown) => {
 
 const formatCurrency = (value: unknown) => {
   const amount = Number(value);
-  if (Number.isNaN(amount)) return formatCellValue(value);
+  if (Number.isNaN(amount)) return 'R$ 0,00';
 
   return amount.toLocaleString('pt-BR', {
     style: 'currency',
     currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 };
 

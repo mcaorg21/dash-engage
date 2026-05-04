@@ -42,6 +42,8 @@ export interface QivezDashboardMonth {
   total: number;
   total_true: number;
   total_false: number;
+  soma_false: number;
+  media_false: number;
 }
 
 export const api = {
