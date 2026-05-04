@@ -315,8 +315,9 @@ const QivezListarView = () => {
                         type="button"
                         disabled={!row.json_xml}
                         onClick={() => downloadXml(row)}
-                        className="rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40"
                       >
+                        <Download size={14} />
                         XML
                       </button>
                     </td>
