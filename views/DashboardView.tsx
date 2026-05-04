@@ -211,13 +211,9 @@ const QivezListarView = () => {
 
       <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-6 py-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="text-sm font-bold text-slate-700">Lancamentos</div>
-            </div>
-
+          <div className="w-full">
             <form
-              className="flex flex-col gap-3 sm:flex-row sm:items-end"
+              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto] lg:items-end"
               onSubmit={event => {
                 event.preventDefault();
                 setAppliedFilters({ dataInicio, dataFim });
@@ -229,7 +225,7 @@ const QivezListarView = () => {
                   type="date"
                   value={dataInicio}
                   onChange={event => setDataInicio(event.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
                 />
               </div>
 
@@ -239,7 +235,7 @@ const QivezListarView = () => {
                   type="date"
                   value={dataFim}
                   onChange={event => setDataFim(event.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
                 />
               </div>
 
