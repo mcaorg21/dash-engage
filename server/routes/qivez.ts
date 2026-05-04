@@ -41,7 +41,13 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
     }
 
     const result = await pool.query(`
-      SELECT *
+      SELECT
+        id,
+        data_lancamento,
+        chave_cte,
+        tipo,
+        diferenca_valor AS valor,
+        json_xml
       FROM public.lancamentos_financeiros
       WHERE ${filters.join(' AND ')}
       ORDER BY id ASC

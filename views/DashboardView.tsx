@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, LayoutDashboard, List, LogOut, Menu, RefreshCw, Upload, Users, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, FileText, LayoutDashboard, List, LogOut, Menu, RefreshCw, Upload, Users, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import { api } from '../utils/api';
 
@@ -13,16 +13,16 @@ const qivezTabs = [
 
 const qivezTitles: Record<string, { title: string; description: string }> = {
   conciliacao_qivez_painel: {
-    title: 'Qivez - Painel',
-    description: 'Resumo operacional da conciliacao Qivez.',
+    title: 'CTe - Painel',
+    description: 'Resumo operacional da conciliacao CTe.',
   },
   conciliacao_qivez_listar: {
-    title: 'Qivez - Listar',
-    description: 'Listagem de registros da conciliacao Qivez.',
+    title: 'CTe - Listar',
+    description: 'Listagem de registros da conciliacao CTe.',
   },
   conciliacao_qivez_importar: {
-    title: 'Qivez - Importar',
-    description: 'Importacao de dados para a conciliacao Qivez.',
+    title: 'CTe - Importar',
+    description: 'Importacao de dados para a conciliacao CTe.',
   },
 };
 
@@ -51,6 +51,28 @@ const formatCellValue = (value: unknown) => {
   if (typeof value === 'boolean') return value ? 'Sim' : 'Nao';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
+};
+
+const formatDatePt = (value: unknown) => {
+  if (!value) return '-';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return formatCellValue(value);
+
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const year = date.getUTCFullYear();
+
+  return `${day}-${month}-${year}`;
+};
+
+const formatCurrency = (value: unknown) => {
+  const amount = Number(value);
+  if (Number.isNaN(amount)) return formatCellValue(value);
+
+  return amount.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
 };
 
 const escapeXml = (value: unknown) => String(value ?? '')
@@ -100,23 +122,50 @@ const jsonToXmlDocument = (value: unknown) => {
   return `<?xml version="1.0" encoding="UTF-8"?>\n${xmlBody}`;
 };
 
-const downloadXml = (row: Record<string, unknown>) => {
-  const xmlSource = row.json_xml;
-  if (!xmlSource) return;
+const getXmlContent = (xmlSource: unknown) => {
+  if (!xmlSource) return '';
 
-  const xmlContent = typeof xmlSource === 'string' && xmlSource.trim().startsWith('<')
+  return typeof xmlSource === 'string' && xmlSource.trim().startsWith('<')
     ? xmlSource
     : jsonToXmlDocument(xmlSource);
+};
 
-  const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8' });
+const downloadTextFile = (content: string, filename: string) => {
+  const blob = new Blob([content], { type: 'application/xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `lancamento-${formatCellValue(row.id)}.xml`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+};
+
+const downloadXml = (row: Record<string, unknown>) => {
+  const xmlContent = getXmlContent(row.json_xml);
+  if (!xmlContent) return;
+
+  downloadTextFile(xmlContent, `lancamento-${formatCellValue(row.id)}.xml`);
+};
+
+const downloadFilteredXml = (rows: Record<string, unknown>[]) => {
+  const items = rows
+    .map(row => {
+      const xmlContent = getXmlContent(row.json_xml).replace(/^\s*<\?xml[^>]*>\s*/i, '');
+      if (!xmlContent) return '';
+
+      return `<lancamento id="${escapeXml(row.id)}" chave_cte="${escapeXml(row.chave_cte)}">${xmlContent}</lancamento>`;
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  if (!items) return;
+
+  downloadTextFile(
+    `<?xml version="1.0" encoding="UTF-8"?>\n<lancamentos>\n${items}\n</lancamentos>`,
+    'lancamentos-qivez-filtrados.xml'
+  );
 };
 
 const QivezListarView = () => {
@@ -151,15 +200,12 @@ const QivezListarView = () => {
     };
   }, [appliedFilters]);
 
-  const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
-  const displayColumns = columns.filter(column => column !== 'json_xml');
-
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">Qivez - Listar</h1>
+        <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">CTe - Listar</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Lancamentos financeiros sem Qives Sysemp, ordenados por ID.
+          Lancamentos financeiros sem CTe Sysemp, ordenados por ID.
         </p>
       </div>
 
@@ -215,6 +261,16 @@ const QivezListarView = () => {
               >
                 Limpar
               </button>
+
+              <button
+                type="button"
+                disabled={rows.length === 0}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--engage-blue-400)]/10 px-4 py-2 text-sm font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => downloadFilteredXml(rows)}
+              >
+                <Download size={16} />
+                Baixar filtrados
+              </button>
             </form>
           </div>
         </div>
@@ -236,20 +292,25 @@ const QivezListarView = () => {
             <table className="w-full min-w-max border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data de lancamento</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Chave CTE</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tipo</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">
                     Download
                   </th>
-                  {displayColumns.map(column => (
-                    <th key={column} className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">
-                      {column}
-                    </th>
-                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {rows.map((row, rowIndex) => (
                   <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
-                    <td className="whitespace-nowrap px-4 py-3">
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_lancamento)}</td>
+                    <td className="max-w-[360px] truncate whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={formatCellValue(row.chave_cte)}>
+                      {formatCellValue(row.chave_cte)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatCellValue(row.tipo)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(row.valor)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
                       <button
                         type="button"
                         disabled={!row.json_xml}
@@ -259,11 +320,6 @@ const QivezListarView = () => {
                         XML
                       </button>
                     </td>
-                    {displayColumns.map(column => (
-                      <td key={column} className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row[column])}>
-                        {formatCellValue(row[column])}
-                      </td>
-                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -372,7 +428,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
                 className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${qivezTabs.some(tab => tab.id === activeTab) ? 'bg-white/15 text-white ring-1 ring-white/15' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
               >
                 <span className="flex items-center gap-3">
-                  <FileText size={18} /> Qivez
+                  <FileText size={18} /> CTe
                 </span>
                 {isQivezOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
               </button>
