@@ -54,8 +54,14 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
         />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-[var(--engage-blue-800)] text-white transition-transform duration-300 md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center justify-between border-b border-white/15 p-6">
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden bg-[#061a5a] text-white transition-transform duration-300 md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="absolute left-[-180px] top-[-120px] h-[420px] w-[420px] rounded-full bg-[#7a1fa2]/65 blur-3xl" />
+        <div className="absolute right-[-220px] top-1/3 h-[460px] w-[460px] rounded-full bg-[#1b4fd3]/70 blur-3xl" />
+        <div className="absolute bottom-[-180px] left-8 h-[380px] w-[380px] rounded-full bg-[#c2185b]/45 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(255,255,255,0.1),rgba(6,26,90,0.18)_38%,rgba(3,12,40,0.72)_100%)]" />
+        <div className="absolute inset-0 opacity-[0.06] [background-image:radial-gradient(rgba(255,255,255,0.75)_1px,transparent_1px)] [background-size:4px_4px]" />
+
+        <div className="relative flex items-center justify-between border-b border-white/15 p-6">
           <div className="min-w-0">
             {showLogoFallback ? (
               <>
@@ -76,10 +82,10 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-6">
+        <nav className="relative flex-1 space-y-1 overflow-y-auto px-4 py-6">
           <button
             onClick={() => handleTabChange('home')}
-            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'home' ? 'bg-[var(--engage-blue-400)] text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'home' ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
           >
             <LayoutDashboard size={18} /> Inicio
           </button>
@@ -91,7 +97,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
               </div>
               <button
                 onClick={() => handleTabChange('usuarios')}
-                className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'usuarios' ? 'bg-[var(--engage-blue-400)] text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'usuarios' ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
               >
                 <Users size={18} /> Controle de Usuarios
               </button>
@@ -99,7 +105,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
           )}
         </nav>
 
-        <div className="border-t border-white/15 p-4">
+        <div className="relative border-t border-white/15 p-4">
           <button onClick={onLogout} className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10">
             <LogOut size={18} /> Sair
           </button>

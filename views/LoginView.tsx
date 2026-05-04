@@ -38,10 +38,10 @@ const LoginView = ({ onLogin }: { onLogin: (email: string, token: string) => voi
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.08),rgba(6,26,90,0.25)_42%,rgba(3,12,40,0.82)_100%)]" />
       <div className="absolute inset-0 opacity-[0.08] [background-image:radial-gradient(rgba(255,255,255,0.7)_1px,transparent_1px)] [background-size:4px_4px]" />
 
-      <div className="z-10 w-full max-w-md rounded-xl border border-white/15 bg-white/95 p-10 shadow-2xl shadow-black/25 backdrop-blur-md">
+      <div className="z-10 w-full max-w-md p-10">
         <div className="mb-8 flex flex-col items-center text-center">
           {showLogoFallback ? (
-            <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">Dash Engage</h1>
+            <h1 className="text-2xl font-bold text-white">Dash Engage</h1>
           ) : (
             <img
               src={LOGIN_LOGO_SRC}
@@ -50,16 +50,16 @@ const LoginView = ({ onLogin }: { onLogin: (email: string, token: string) => voi
               onError={() => setShowLogoFallback(true)}
             />
           )}
-          <p className="mt-1 text-sm font-medium text-slate-500">Area restrita</p>
+          <p className="mt-1 text-sm font-medium text-white/75">Area restrita</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-widest text-[var(--engage-blue-800)]">E-mail</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-white/85">E-mail</label>
             <input
               type="email"
               required
-              className="w-full rounded-lg border border-white/20 bg-white px-4 py-3 text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-white/30"
+              className="w-full rounded-lg border border-white/35 bg-white/10 px-4 py-3 text-white outline-none backdrop-blur-sm transition-colors placeholder:text-white/55 focus:border-white/80 focus:bg-white/15 focus:ring-2 focus:ring-white/25"
               placeholder="usuario@empresa.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -68,15 +68,15 @@ const LoginView = ({ onLogin }: { onLogin: (email: string, token: string) => voi
 
           <div className="space-y-1">
             <div className="flex items-center justify-between gap-3">
-              <label className="text-xs font-bold uppercase tracking-widest text-[var(--engage-blue-800)]">Senha</label>
-              <span className="text-right text-[10px] font-bold uppercase text-slate-400">
+              <label className="text-xs font-bold uppercase tracking-widest text-white/85">Senha</label>
+              <span className="text-right text-[10px] font-bold uppercase text-white/60">
                 Fale com o administrador.
               </span>
             </div>
             <input
               type="password"
               required
-              className="w-full rounded-lg border border-white/20 bg-white px-4 py-3 text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-white/30"
+              className="w-full rounded-lg border border-white/35 bg-white/10 px-4 py-3 text-white outline-none backdrop-blur-sm transition-colors placeholder:text-white/55 focus:border-white/80 focus:bg-white/15 focus:ring-2 focus:ring-white/25"
               placeholder="********"
               value={password}
               onChange={e => setPassword(e.target.value)}
