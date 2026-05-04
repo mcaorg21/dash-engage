@@ -3,7 +3,7 @@ import { LayoutDashboard, LogOut, Menu, RefreshCw, Users, X } from 'lucide-react
 import UserManagementView from './UserManagementView';
 import { api } from '../utils/api';
 
-const INTERNAL_LOGO_SRC = '/logo/logo_white.webp';
+const INTERNAL_LOGO_SRC = '/logo/white-logo.7e189ed.webp';
 
 const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void }) => {
   const [activeTab, setActiveTab] = useState('home');
