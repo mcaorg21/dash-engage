@@ -62,7 +62,7 @@ const formatDatePt = (value: unknown) => {
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const year = date.getUTCFullYear();
 
-  return `${day}-${month}-${year}`;
+  return `${day}/${month}/${year}`;
 };
 
 const formatCurrency = (value: unknown) => {
@@ -214,9 +214,6 @@ const QivezListarView = () => {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="text-sm font-bold text-slate-700">Lancamentos</div>
-              <div className="mt-1 text-xs font-medium text-slate-400">
-                SELECT * FROM public.lancamentos_financeiros WHERE existe_qives_sysemp = false ORDER BY id ASC
-              </div>
             </div>
 
             <form
