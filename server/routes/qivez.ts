@@ -61,7 +61,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
       return;
     }
 
-    const { dataInicio, dataFim } = req.query;
+    const { dataInicio, dataFim, chaveCte } = req.query;
     const filters = ['existe_qives_sysemp = false'];
     const values: string[] = [];
 
@@ -73,6 +73,11 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
     if (typeof dataFim === 'string' && dataFim) {
       values.push(dataFim);
       filters.push(`data_lancamento::date <= $${values.length}`);
+    }
+
+    if (typeof chaveCte === 'string' && chaveCte.trim()) {
+      values.push(`%${chaveCte.trim()}%`);
+      filters.push(`chave_cte ILIKE $${values.length}`);
     }
 
     const result = await pool.query(`

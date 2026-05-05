@@ -576,7 +576,8 @@ const QivezListarView = () => {
   const [error, setError] = useState<string | null>(null);
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '' });
+  const [chaveCte, setChaveCte] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveCte: '' });
 
   useEffect(() => {
     let cancelled = false;
@@ -615,10 +616,10 @@ const QivezListarView = () => {
         <div className="border-b border-slate-100 px-6 py-4">
           <div className="w-full">
             <form
-              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto] lg:items-end"
+              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(220px,1.4fr)_auto_auto_auto] lg:items-end"
               onSubmit={event => {
                 event.preventDefault();
-                setAppliedFilters({ dataInicio, dataFim });
+                setAppliedFilters({ dataInicio, dataFim, chaveCte: chaveCte.trim() });
               }}
             >
               <div>
@@ -641,6 +642,17 @@ const QivezListarView = () => {
                 />
               </div>
 
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Chave CTE</label>
+                <input
+                  type="search"
+                  value={chaveCte}
+                  onChange={event => setChaveCte(event.target.value)}
+                  placeholder="Buscar pela chave"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                />
+              </div>
+
               <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
                 Filtrar
               </button>
@@ -651,7 +663,8 @@ const QivezListarView = () => {
                 onClick={() => {
                   setDataInicio('');
                   setDataFim('');
-                  setAppliedFilters({ dataInicio: '', dataFim: '' });
+                  setChaveCte('');
+                  setAppliedFilters({ dataInicio: '', dataFim: '', chaveCte: '' });
                 }}
               >
                 Limpar
