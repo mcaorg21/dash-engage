@@ -29,8 +29,8 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
     const result = await pool.query(`
       SELECT
           DATE_TRUNC('month', data_lancamento) AS mes,
-          COUNT(DISTINCT chave_cte) FILTER (WHERE cancelada = false)::int AS total,
-          COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = true AND cancelada = false)::int  AS total_true,
+          COUNT(DISTINCT chave_cte)::int AS total,
+          COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = false AND cancelada = true)::int  AS total_cancelado,
           COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false)::int AS total_false,
           COALESCE(SUM(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false), 0)::float AS soma_false,
           COALESCE(AVG(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false), 0)::float AS media_false
@@ -42,7 +42,7 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
     res.json(result.rows.map(row => ({
       mes: row.mes,
       total: Number(row.total || 0),
-      total_true: Number(row.total_true || 0),
+      total_cancelado: Number(row.total_cancelado || 0),
       total_false: Number(row.total_false || 0),
       soma_false: Number(row.soma_false || 0),
       media_false: Number(row.media_false || 0),

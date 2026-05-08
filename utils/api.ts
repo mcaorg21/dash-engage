@@ -40,7 +40,7 @@ export type QivezLancamento = Record<string, unknown>;
 export interface QivezDashboardMonth {
   mes: string;
   total: number;
-  total_true: number;
+  total_cancelado: number;
   total_false: number;
   soma_false: number;
   media_false: number;

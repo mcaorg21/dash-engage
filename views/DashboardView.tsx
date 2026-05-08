@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import JSZip from 'jszip';
-import { BarChart3, CheckCircle2, ChevronDown, ChevronRight, Download, FileText, LayoutDashboard, List, LogOut, Menu, RefreshCw, Upload, Users, XCircle, X } from 'lucide-react';
+import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Download, FileText, LayoutDashboard, List, LogOut, Menu, RefreshCw, Upload, Users, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import { api } from '../utils/api';
 
@@ -143,11 +143,11 @@ const QivezPainelView = () => {
   const totals = rows.reduce(
     (acc, row) => ({
       total: acc.total + Number(row.total || 0),
-      totalTrue: acc.totalTrue + Number(row.total_true || 0),
+      totalCancelado: acc.totalCancelado + Number(row.total_cancelado || 0),
       totalFalse: acc.totalFalse + Number(row.total_false || 0),
       somaFalse: acc.somaFalse + Number(row.soma_false || 0),
     }),
-    { total: 0, totalTrue: 0, totalFalse: 0, somaFalse: 0 }
+    { total: 0, totalCancelado: 0, totalFalse: 0, somaFalse: 0 }
   );
   const mediaFalse = totals.totalFalse ? totals.somaFalse / totals.totalFalse : 0;
   const maxValue = Math.max(...rows.map(row => Number(row.total || 0)), 1);
@@ -177,7 +177,7 @@ const QivezPainelView = () => {
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <DashboardCard title="Total CTe" value={totals.total} icon={BarChart3} tone="bg-[var(--engage-blue-400)]/10 text-[var(--engage-blue-800)]" />
-            <DashboardCard title="Conciliados" value={totals.totalTrue} icon={CheckCircle2} tone="bg-emerald-50 text-emerald-600" />
+            <DashboardCard title="Cancelados" value={totals.totalCancelado} icon={AlertCircle} tone="bg-amber-50 text-amber-600" />
             <DashboardCard
               title="Pendentes"
               value={totals.totalFalse}
@@ -188,7 +188,7 @@ const QivezPainelView = () => {
                 { label: 'Media', value: formatCurrency(mediaFalse) },
               ]}
             />
-            <DashboardCard title="Ultimo mes" value={lastMonth?.total ?? 0} icon={RefreshCw} tone="bg-[var(--engage-blue-500)]/10 text-[var(--engage-blue-500)]" />
+            <DashboardCard title="Ultimo mes" value={lastMonth?.total_false ?? 0} icon={RefreshCw} tone="bg-[var(--engage-blue-500)]/10 text-[var(--engage-blue-500)]" />
           </div>
 
           <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
@@ -199,7 +199,7 @@ const QivezPainelView = () => {
               </div>
               <div className="flex flex-wrap gap-3 text-xs font-bold text-slate-500">
                 <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[var(--engage-blue-600)]" /> Total</span>
-                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Conciliados</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Cancelados</span>
                 <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> Pendentes</span>
               </div>
             </div>
@@ -237,7 +237,7 @@ const QivezPainelView = () => {
                     const yForPending = (value: number) => 272 - (value / maxPendingValue) * chartHeight;
                     const barSeries = [
                       { key: 'total' as const, label: 'Total', color: 'var(--engage-blue-600)', offset: -barWidth / 2 - 2 },
-                      { key: 'total_true' as const, label: 'Conciliados', color: '#10b981', offset: barWidth / 2 + 2 },
+                      { key: 'total_cancelado' as const, label: 'Cancelados', color: '#f59e0b', offset: barWidth / 2 + 2 },
                     ];
                     const points = rows.map((row, index) => ({
                       row,
