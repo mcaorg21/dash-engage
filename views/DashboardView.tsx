@@ -103,6 +103,7 @@ const DashboardCard = ({
 
 const QivezPainelView = () => {
   const [rows, setRows] = useState<import('../utils/api').QivezDashboardMonth[]>([]);
+  const [totalCancelado, setTotalCancelado] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartTooltip, setChartTooltip] = useState<{
@@ -125,7 +126,10 @@ const QivezPainelView = () => {
 
       try {
         const data = await api.getQivezDashboard();
-        if (!cancelled) setRows(data);
+        if (!cancelled) {
+          setRows(data.months);
+          setTotalCancelado(data.totalCancelado);
+        }
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Erro ao carregar painel.');
       } finally {
@@ -143,11 +147,10 @@ const QivezPainelView = () => {
   const totals = rows.reduce(
     (acc, row) => ({
       total: acc.total + Number(row.total || 0),
-      totalCancelado: acc.totalCancelado + Number(row.total_cancelado || 0),
       totalFalse: acc.totalFalse + Number(row.total_false || 0),
       somaFalse: acc.somaFalse + Number(row.soma_false || 0),
     }),
-    { total: 0, totalCancelado: 0, totalFalse: 0, somaFalse: 0 }
+    { total: 0, totalFalse: 0, somaFalse: 0 }
   );
   const mediaFalse = totals.totalFalse ? totals.somaFalse / totals.totalFalse : 0;
   const maxValue = Math.max(...rows.map(row => Number(row.total || 0)), 1);
@@ -177,7 +180,7 @@ const QivezPainelView = () => {
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <DashboardCard title="Total CTe" value={totals.total} icon={BarChart3} tone="bg-[var(--engage-blue-400)]/10 text-[var(--engage-blue-800)]" />
-            <DashboardCard title="Cancelados" value={totals.totalCancelado} icon={AlertCircle} tone="bg-amber-50 text-amber-600" />
+            <DashboardCard title="Cancelados" value={totalCancelado} icon={AlertCircle} tone="bg-amber-50 text-amber-600" />
             <DashboardCard
               title="Pendentes"
               value={totals.totalFalse}
@@ -199,7 +202,6 @@ const QivezPainelView = () => {
               </div>
               <div className="flex flex-wrap gap-3 text-xs font-bold text-slate-500">
                 <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[var(--engage-blue-600)]" /> Total</span>
-                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Cancelados</span>
                 <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> Pendentes</span>
               </div>
             </div>
@@ -236,8 +238,7 @@ const QivezPainelView = () => {
                     const yFor = (value: number) => 272 - (value / maxValue) * chartHeight;
                     const yForPending = (value: number) => 272 - (value / maxPendingValue) * chartHeight;
                     const barSeries = [
-                      { key: 'total' as const, label: 'Total', color: 'var(--engage-blue-600)', offset: -barWidth / 2 - 2 },
-                      { key: 'total_cancelado' as const, label: 'Cancelados', color: '#f59e0b', offset: barWidth / 2 + 2 },
+                      { key: 'total' as const, label: 'Total', color: 'var(--engage-blue-600)', offset: 0 },
                     ];
                     const points = rows.map((row, index) => ({
                       row,

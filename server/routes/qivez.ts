@@ -26,27 +26,33 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
       return;
     }
 
-    const result = await pool.query(`
-      SELECT
-          DATE_TRUNC('month', data_lancamento) AS mes,
-          COUNT(DISTINCT chave_cte)::int AS total,
-          COUNT(*) FILTER (WHERE cancelada = true)::int AS total_cancelado,
-          COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false)::int AS total_false,
-          COALESCE(SUM(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false), 0)::float AS soma_false,
-          COALESCE(AVG(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false), 0)::float AS media_false
-      FROM lancamentos_financeiros
-      GROUP BY 1
-      ORDER BY 1
-    `);
+    const [monthly, canceladosResult] = await Promise.all([
+      pool.query(`
+        SELECT
+            DATE_TRUNC('month', data_lancamento) AS mes,
+            COUNT(DISTINCT chave_cte)::int AS total,
+            COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false)::int AS total_false,
+            COALESCE(SUM(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false), 0)::float AS soma_false,
+            COALESCE(AVG(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false), 0)::float AS media_false
+        FROM lancamentos_financeiros
+        GROUP BY 1
+        ORDER BY 1
+      `),
+      pool.query(`SELECT COUNT(*)::int AS total_cancelado FROM lancamentos_financeiros WHERE cancelada = true`),
+    ]);
 
-    res.json(result.rows.map(row => ({
-      mes: row.mes,
-      total: Number(row.total || 0),
-      total_cancelado: Number(row.total_cancelado || 0),
-      total_false: Number(row.total_false || 0),
-      soma_false: Number(row.soma_false || 0),
-      media_false: Number(row.media_false || 0),
-    })));
+    const totalCancelado = Number(canceladosResult.rows[0]?.total_cancelado || 0);
+
+    res.json({
+      totalCancelado,
+      months: monthly.rows.map(row => ({
+        mes: row.mes,
+        total: Number(row.total || 0),
+        total_false: Number(row.total_false || 0),
+        soma_false: Number(row.soma_false || 0),
+        media_false: Number(row.media_false || 0),
+      })),
+    });
   } catch (err) {
     console.error('Qivez dashboard error:', err);
     res.status(500).json({ error: 'Erro interno do servidor' });

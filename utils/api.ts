@@ -40,10 +40,14 @@ export type QivezLancamento = Record<string, unknown>;
 export interface QivezDashboardMonth {
   mes: string;
   total: number;
-  total_cancelado: number;
   total_false: number;
   soma_false: number;
   media_false: number;
+}
+
+export interface QivezDashboardResponse {
+  totalCancelado: number;
+  months: QivezDashboardMonth[];
 }
 
 export const api = {
@@ -96,5 +100,5 @@ export const api = {
     return request<QivezLancamento[]>(`/qivez/lancamentos${query ? `?${query}` : ''}`);
   },
 
-  getQivezDashboard: () => request<QivezDashboardMonth[]>('/qivez/dashboard'),
+  getQivezDashboard: () => request<QivezDashboardResponse>('/qivez/dashboard'),
 };
