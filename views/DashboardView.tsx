@@ -127,8 +127,8 @@ const QivezPainelView = () => {
       try {
         const data = await api.getQivezDashboard();
         if (!cancelled) {
-          setRows(data.months);
-          setTotalCancelado(data.totalCancelado);
+          setRows(data.months ?? []);
+          setTotalCancelado(data.totalCancelado ?? 0);
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Erro ao carregar painel.');
