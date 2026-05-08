@@ -13,7 +13,7 @@ const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.RAIL
 const app = express();
 
 if (!isProd) {
-  app.use(cors({ origin: ['http://localhost:3141', 'http://0.0.0.0:3141'] }));
+  app.use(cors({ origin: ['http://localhost:3143', 'http://0.0.0.0:3143'] }));
 }
 
 app.use(express.json());
@@ -29,7 +29,7 @@ if (isProd) {
   app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
 }
 
-const PORT = process.env.PORT ? Number(process.env.PORT) : 3140;
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3142;
 
 initDb().then(() => {
   app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));

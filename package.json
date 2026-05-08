@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "server": "node --env-file-if-exists=.env.local --import tsx server/index.ts",
     "seed": "node --env-file-if-exists=.env.local --import tsx server/seed.ts",
-    "start": "node --import tsx server/index.ts",
+    "start": "node --env-file-if-exists=.env.local --import tsx server/index.ts",
     "start:prod": "node --import tsx server/index.ts"
   },
   "dependencies": {

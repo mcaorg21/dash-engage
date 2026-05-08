@@ -31,9 +31,9 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
           DATE_TRUNC('month', data_lancamento) AS mes,
           COUNT(DISTINCT chave_cte)::int AS total,
           COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = true)::int  AS total_true,
-          COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = false)::int AS total_false,
-          COALESCE(SUM(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false), 0)::float AS soma_false,
-          COALESCE(AVG(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false), 0)::float AS media_false
+          COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false)::int AS total_false,
+          COALESCE(SUM(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false), 0)::float AS soma_false,
+          COALESCE(AVG(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false), 0)::float AS media_false
       FROM lancamentos_financeiros
       GROUP BY 1
       ORDER BY 1
@@ -62,7 +62,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
     }
 
     const { dataInicio, dataFim, chaveCte } = req.query;
-    const filters = ['existe_qives_sysemp = false'];
+    const filters = ['existe_qives_sysemp = false', 'cancelada = false'];
     const values: string[] = [];
 
     if (typeof dataInicio === 'string' && dataInicio) {
