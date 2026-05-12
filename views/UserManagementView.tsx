@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Key, Loader2, Plus, Search, Settings2, Shield, Trash2, Users, X } from 'lucide-react';
 import { api } from '../utils/api';
+import { useModal } from '../components/useModal';
 
 const MENU_ITEMS = [
   { id: 'conciliacao_qivez_painel', label: 'Painel', group: 'Conciliacao / CTe' },
   { id: 'conciliacao_qivez_listar', label: 'Listar', group: 'Conciliacao / CTe' },
   { id: 'conciliacao_qivez_importar', label: 'Importar', group: 'Conciliacao / CTe' },
+  { id: 'ferramentas_planilhas', label: 'Planilhas', group: 'Ferramentas' },
   { id: 'usuarios', label: 'Controle de Usuarios', group: 'Administracao' },
 ];
 
@@ -25,15 +27,15 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
   const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [alertMessage, setAlertMessage] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const { modal, alert: showAlertModal, danger } = useModal();
   const [resetPasswordTarget, setResetPasswordTarget] = useState<string | null>(null);
   const [newPasswordValue, setNewPasswordValue] = useState('');
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const showAlert = (message: string) => setAlertMessage(message);
-  const showConfirm = (message: string, onConfirm: () => void) => setConfirmAction({ message, onConfirm });
+  const showAlert = (message: string) => showAlertModal(message);
+  const showConfirm = (message: string, onConfirm: () => void) =>
+    danger(message).then(ok => { if (ok) onConfirm(); });
 
   const loadUsers = async () => {
     try {
@@ -365,40 +367,7 @@ const UserManagementView = ({ currentUser }: { currentUser: string }) => {
         </div>
       )}
 
-      {confirmAction && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--engage-blue-800)]/60 p-4 backdrop-blur-sm">
-          <div className="flex w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl">
-            <div className="p-6">
-              <h3 className="mb-2 text-lg font-bold text-slate-800">Confirmacao</h3>
-              <p className="whitespace-pre-wrap text-sm text-slate-600">{confirmAction.message}</p>
-            </div>
-            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 p-4">
-              <button onClick={() => setConfirmAction(null)} className="rounded-lg px-4 py-2 font-medium text-slate-600 transition-colors hover:bg-slate-200">
-                Cancelar
-              </button>
-              <button onClick={() => { confirmAction.onConfirm(); setConfirmAction(null); }} className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700">
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {alertMessage && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--engage-blue-800)]/60 p-4 backdrop-blur-sm">
-          <div className="flex w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl">
-            <div className="p-6">
-              <h3 className="mb-2 text-lg font-bold text-slate-800">Aviso</h3>
-              <p className="whitespace-pre-wrap text-sm text-slate-600">{alertMessage}</p>
-            </div>
-            <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-4">
-              <button onClick={() => setAlertMessage(null)} className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 font-medium text-white transition-colors hover:bg-[var(--engage-blue-500)]">
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {modal}
     </div>
   );
 };

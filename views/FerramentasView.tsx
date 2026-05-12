@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, FileSpreadsheet, Loader2, Trash2, Upload, X } from 'lucide-react';
 import { api, type BucketFile } from '../utils/api';
+import { useModal } from '../components/useModal';
 
 const ACCEPTED = ['.xlsx', '.xls', '.csv', '.ods', '.xlsm', '.tsv'];
 
@@ -30,6 +31,7 @@ const PlanilhasView = () => {
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
+  const { modal, alert, danger } = useModal();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadFiles = useCallback(async () => {
@@ -88,13 +90,14 @@ const PlanilhasView = () => {
   };
 
   const handleDelete = async (file: BucketFile) => {
-    if (!window.confirm(`Deletar "${file.name}"?`)) return;
+    const ok = await danger(`Deletar "${file.name}"?\n\nEssa acao nao pode ser desfeita.`, 'Deletar arquivo');
+    if (!ok) return;
     setDeletingFile(file.name);
     try {
       await api.deletePlanilha(file.name);
       await loadFiles();
     } catch (err: any) {
-      alert(err.message || 'Erro ao deletar arquivo.');
+      await alert(err.message || 'Erro ao deletar arquivo.', 'Erro');
     } finally {
       setDeletingFile(null);
     }
@@ -116,6 +119,7 @@ const PlanilhasView = () => {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      {modal}
       <div>
         <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">Planilhas</h1>
         <p className="mt-1 text-sm text-slate-500">
