@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Download, FileSpreadsheet, Loader2, Upload, X } from 'lucide-react';
+import { Download, FileSpreadsheet, Loader2, Trash2, Upload, X } from 'lucide-react';
 import { api, type BucketFile } from '../utils/api';
 
 const ACCEPTED = ['.xlsx', '.xls', '.csv', '.ods', '.xlsm', '.tsv'];
@@ -29,6 +29,7 @@ const PlanilhasView = () => {
   const [bucketFiles, setBucketFiles] = useState<BucketFile[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
+  const [deletingFile, setDeletingFile] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadFiles = useCallback(async () => {
@@ -83,6 +84,19 @@ const PlanilhasView = () => {
       setUploadError(err.message || 'Erro ao fazer upload.');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleDelete = async (file: BucketFile) => {
+    if (!window.confirm(`Deletar "${file.name}"?`)) return;
+    setDeletingFile(file.name);
+    try {
+      await api.deletePlanilha(file.name);
+      await loadFiles();
+    } catch (err: any) {
+      alert(err.message || 'Erro ao deletar arquivo.');
+    } finally {
+      setDeletingFile(null);
     }
   };
 
@@ -238,7 +252,7 @@ const PlanilhasView = () => {
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nome</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tamanho</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Atualizado em</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Download</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Acoes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -253,14 +267,27 @@ const PlanilhasView = () => {
                     <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatBytes(file.size)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatDate(file.updated)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleDownload(file)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20"
-                      >
-                        <Download size={13} />
-                        Baixar
-                      </button>
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleDownload(file)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20"
+                        >
+                          <Download size={13} />
+                          Baixar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(file)}
+                          disabled={deletingFile === file.name}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+                        >
+                          {deletingFile === file.name
+                            ? <Loader2 size={13} className="animate-spin" />
+                            : <Trash2 size={13} />}
+                          Deletar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

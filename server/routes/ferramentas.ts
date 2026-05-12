@@ -79,6 +79,21 @@ router.post('/planilhas/upload', upload.array('files'), async (req: AuthRequest,
   }
 });
 
+router.delete('/planilhas', async (req: AuthRequest, res) => {
+  try {
+    const filename = String(req.query.file || '');
+    if (!filename) {
+      res.status(400).json({ error: 'Arquivo nao informado.' });
+      return;
+    }
+    await gcs.bucket(BUCKET_NAME).file(filename).delete();
+    res.json({ deleted: filename });
+  } catch (err) {
+    console.error('GCS delete error:', err);
+    res.status(500).json({ error: 'Erro ao deletar arquivo.' });
+  }
+});
+
 router.get('/planilhas/download', async (req: AuthRequest, res) => {
   try {
     const filename = String(req.query.file || '');
