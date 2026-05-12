@@ -2,7 +2,11 @@ import { Router } from 'express';
 import multer from 'multer';
 import { Storage } from '@google-cloud/storage';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { authenticate, type AuthRequest } from '../middleware/auth.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -17,7 +21,7 @@ function createStorage() {
   }
   const keyFilename =
     process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-    path.join('C:\\', '.credentials', 'engage-eletro-ea9e7604c7b8.json');
+    path.join(PROJECT_ROOT, '.credentials', 'engage-eletro-ea9e7604c7b8.json');
   return new Storage({ keyFilename });
 }
 
