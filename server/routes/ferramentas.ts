@@ -79,9 +79,9 @@ router.post('/planilhas/upload', upload.array('files'), async (req: AuthRequest,
   }
 });
 
-router.delete('/planilhas', async (req: AuthRequest, res) => {
+router.post('/planilhas/delete', async (req: AuthRequest, res) => {
   try {
-    const filename = String(req.query.file || '');
+    const filename = String(req.body?.file || '');
     if (!filename) {
       res.status(400).json({ error: 'Arquivo nao informado.' });
       return;

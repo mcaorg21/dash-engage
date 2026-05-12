@@ -131,5 +131,8 @@ export const api = {
     `${API_BASE}/ferramentas/planilhas/download?file=${encodeURIComponent(filename)}`,
 
   deletePlanilha: (filename: string) =>
-    request<{ deleted: string }>(`/ferramentas/planilhas?file=${encodeURIComponent(filename)}`, { method: 'DELETE' }),
+    request<{ deleted: string }>('/ferramentas/planilhas/delete', {
+      method: 'POST',
+      body: JSON.stringify({ file: filename }),
+    }),
 };
