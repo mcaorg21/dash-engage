@@ -37,6 +37,13 @@ export interface LoginResponse {
 
 export type QivezLancamento = Record<string, unknown>;
 
+export interface BucketFile {
+  name: string;
+  size: number;
+  updated: string | null;
+  contentType: string | null;
+}
+
 export interface QivezDashboardMonth {
   mes: string;
   total: number;
@@ -101,4 +108,25 @@ export const api = {
   },
 
   getQivezDashboard: () => request<QivezDashboardResponse>('/qivez/dashboard'),
+
+  getPlanilhas: () => request<BucketFile[]>('/ferramentas/planilhas'),
+
+  uploadPlanilhas: async (files: File[]): Promise<{ uploaded: string[] }> => {
+    const token = getToken();
+    const form = new FormData();
+    files.forEach(f => form.append('files', f));
+    const res = await fetch(`${API_BASE}/ferramentas/planilhas/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const text = await res.text();
+    let data: any;
+    try { data = JSON.parse(text); } catch { throw new Error(`Erro de servidor (${res.status}).`); }
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  },
+
+  downloadPlanilhaUrl: (filename: string) =>
+    `${API_BASE}/ferramentas/planilhas/download?file=${encodeURIComponent(filename)}`,
 };

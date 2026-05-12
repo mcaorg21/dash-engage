@@ -6,6 +6,7 @@ import { initDb } from './db.js';
 import authRoutes from './routes/auth.js';
 import usersRoutes from './routes/users.js';
 import qivezRoutes from './routes/qivez.js';
+import ferramentasRoutes from './routes/ferramentas.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.RAILWAY_ENVIRONMENT_NAME);
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/qivez', qivezRoutes);
+app.use('/api/ferramentas', ferramentasRoutes);
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
 if (isProd) {

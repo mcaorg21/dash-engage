@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import JSZip from 'jszip';
-import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Download, FileText, LayoutDashboard, List, LogOut, Menu, RefreshCw, Upload, Users, XCircle, X } from 'lucide-react';
+import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Download, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, RefreshCw, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
+import PlanilhasView from './FerramentasView';
 import { api } from '../utils/api';
 
 const INTERNAL_LOGO_SRC = '/logo/white-logo.7e189ed.webp';
@@ -10,6 +11,10 @@ const qivezTabs = [
   { id: 'conciliacao_qivez_painel', label: 'Painel', icon: LayoutDashboard },
   { id: 'conciliacao_qivez_listar', label: 'Listar', icon: List },
   { id: 'conciliacao_qivez_importar', label: 'Importar', icon: Upload },
+];
+
+const ferramentasTabs = [
+  { id: 'ferramentas_planilhas', label: 'Planilhas', icon: FileSpreadsheet },
 ];
 
 const qivezTitles: Record<string, { title: string; description: string }> = {
@@ -745,6 +750,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
   const [activeTab, setActiveTab] = useState('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isQivezOpen, setIsQivezOpen] = useState(false);
+  const [isFerramentasOpen, setIsFerramentasOpen] = useState(false);
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -777,6 +783,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
 
   const hasPermission = (id: string) => isAdmin || userPermissions.includes(id);
   const hasAnyQivezPermission = qivezTabs.some(tab => hasPermission(tab.id));
+  const hasAnyFerramentasPermission = ferramentasTabs.some(tab => hasPermission(tab.id));
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -864,6 +871,41 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
             </>
           )}
 
+          {hasAnyFerramentasPermission && (
+            <>
+              <div className="px-4 pb-2 pt-5 text-[10px] font-bold uppercase tracking-widest text-white/50">
+                Ferramentas
+              </div>
+              <button
+                onClick={() => setIsFerramentasOpen(!isFerramentasOpen)}
+                className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${ferramentasTabs.some(tab => tab.id === activeTab) ? 'bg-white/15 text-white ring-1 ring-white/15' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+              >
+                <span className="flex items-center gap-3">
+                  <Wrench size={18} /> Ferramentas
+                </span>
+                {isFerramentasOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </button>
+
+              {isFerramentasOpen && (
+                <div className="space-y-1 pl-4">
+                  {ferramentasTabs.map(tab => {
+                    if (!hasPermission(tab.id)) return null;
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => handleTabChange(tab.id)}
+                        className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                      >
+                        <Icon size={16} /> {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
           {hasPermission('usuarios') && (
             <>
               <div className="px-4 pb-2 pt-5 text-[10px] font-bold uppercase tracking-widest text-white/50">
@@ -929,6 +971,10 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
 
           {activeTab !== 'conciliacao_qivez_listar' && activeTab !== 'conciliacao_qivez_painel' && qivezTabs.some(tab => tab.id === activeTab) && hasPermission(activeTab) && (
             <QivezPlaceholderView tab={activeTab} />
+          )}
+
+          {activeTab === 'ferramentas_planilhas' && hasPermission('ferramentas_planilhas') && (
+            <PlanilhasView />
           )}
         </div>
       </main>
