@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Download, FileSpreadsheet, Loader2, Trash2, Upload, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, Download, FileSpreadsheet, Loader2, Save, Trash2, Upload, X } from 'lucide-react';
 import { api, type BucketFile } from '../utils/api';
 import { useModal } from '../components/useModal';
+import { TRANSPORTADORAS } from '../utils/transportadoras';
 
 const ACCEPTED = ['.xlsx', '.xls', '.csv', '.ods', '.xlsm', '.tsv'];
 
@@ -21,6 +23,121 @@ const formatDate = (value: string | null) => {
   });
 };
 
+interface SearchableSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+  disabled?: boolean;
+}
+
+function SearchableSelect({ value, onChange, options, disabled }: SearchableSelectProps) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleToggle = () => {
+    if (disabled) return;
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 320) });
+    }
+    setOpen(v => !v);
+    setSearch('');
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        !btnRef.current?.contains(e.target as Node) &&
+        !dropRef.current?.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  const filtered = options.filter(o =>
+    !search || o.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        disabled={disabled}
+        onClick={handleToggle}
+        className="flex w-52 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs transition-colors hover:border-[var(--engage-blue-400)] hover:bg-slate-50 disabled:opacity-50"
+      >
+        <span className="flex-1 truncate text-left">
+          {value
+            ? <span className="font-medium text-slate-700">{value}</span>
+            : <span className="text-slate-400">Selecionar transportadora...</span>}
+        </span>
+        <ChevronDown size={12} className="shrink-0 text-slate-400" />
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={dropRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
+          className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+        >
+          <div className="border-b border-slate-100 p-2">
+            <input
+              ref={inputRef}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Procurar transportadora..."
+              className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-[var(--engage-blue-400)]"
+            />
+          </div>
+          {value && (
+            <button
+              type="button"
+              onClick={() => { onChange(''); setOpen(false); setSearch(''); }}
+              className="flex w-full items-center gap-2 border-b border-slate-50 px-3 py-2 text-left text-xs text-slate-400 hover:bg-slate-50"
+            >
+              <X size={11} /> Limpar selecao
+            </button>
+          )}
+          <ul className="max-h-56 overflow-y-auto">
+            {filtered.map(option => (
+              <li key={option}>
+                <button
+                  type="button"
+                  onClick={() => { onChange(option); setOpen(false); setSearch(''); }}
+                  className={`w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-slate-50 ${
+                    value === option
+                      ? 'bg-[var(--engage-blue-400)]/10 font-semibold text-[var(--engage-blue-700)]'
+                      : 'text-slate-700'
+                  }`}
+                >
+                  {option}
+                </button>
+              </li>
+            ))}
+            {filtered.length === 0 && (
+              <li className="px-3 py-4 text-center text-xs text-slate-400">Nenhum resultado</li>
+            )}
+          </ul>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 const PlanilhasView = () => {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -31,6 +148,8 @@ const PlanilhasView = () => {
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
+  const [editTransportadoras, setEditTransportadoras] = useState<Record<string, string>>({});
+  const [savingTransportadora, setSavingTransportadora] = useState<string | null>(null);
   const { modal, alert, danger } = useModal();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -39,7 +158,11 @@ const PlanilhasView = () => {
     setListError(null);
     try {
       const data = await api.getPlanilhas();
-      setBucketFiles(data.sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? '')));
+      const sorted = data.sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''));
+      setBucketFiles(sorted);
+      setEditTransportadoras(
+        Object.fromEntries(sorted.map(f => [f.name, f.transportadora ?? ''])),
+      );
     } catch (err: any) {
       setListError(err.message || 'Erro ao listar arquivos.');
     } finally {
@@ -115,6 +238,21 @@ const PlanilhasView = () => {
         a.click();
         URL.revokeObjectURL(a.href);
       });
+  };
+
+  const handleSaveTransportadora = async (file: BucketFile) => {
+    const transportadora = editTransportadoras[file.name] ?? '';
+    setSavingTransportadora(file.name);
+    try {
+      await api.updatePlanilhaMetadata(file.name, transportadora);
+      setBucketFiles(prev =>
+        prev.map(f => f.name === file.name ? { ...f, transportadora } : f),
+      );
+    } catch (err: any) {
+      await alert(err.message || 'Erro ao salvar transportadora.', 'Erro');
+    } finally {
+      setSavingTransportadora(null);
+    }
   };
 
   return (
@@ -256,45 +394,74 @@ const PlanilhasView = () => {
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nome</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tamanho</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Atualizado em</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Transportadora</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Acoes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {bucketFiles.map(file => (
-                  <tr key={file.name} className="hover:bg-slate-50/70">
-                    <td className="flex items-center gap-2 whitespace-nowrap px-4 py-3">
-                      <FileSpreadsheet size={15} className="shrink-0 text-emerald-500" />
-                      <span className="max-w-[400px] truncate font-medium text-slate-700" title={file.name}>
-                        {file.name}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatBytes(file.size)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatDate(file.updated)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleDownload(file)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20"
-                        >
-                          <Download size={13} />
-                          Baixar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(file)}
-                          disabled={deletingFile === file.name}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
-                        >
-                          {deletingFile === file.name
-                            ? <Loader2 size={13} className="animate-spin" />
-                            : <Trash2 size={13} />}
-                          Deletar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {bucketFiles.map(file => {
+                  const currentEdit = editTransportadoras[file.name] ?? '';
+                  const savedValue = file.transportadora ?? '';
+                  const isDirty = currentEdit !== savedValue;
+                  const isSaving = savingTransportadora === file.name;
+
+                  return (
+                    <tr key={file.name} className="hover:bg-slate-50/70">
+                      <td className="flex items-center gap-2 whitespace-nowrap px-4 py-3">
+                        <FileSpreadsheet size={15} className="shrink-0 text-emerald-500" />
+                        <span className="max-w-[300px] truncate font-medium text-slate-700" title={file.name}>
+                          {file.name}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatBytes(file.size)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatDate(file.updated)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <SearchableSelect
+                            value={currentEdit}
+                            onChange={v => setEditTransportadoras(prev => ({ ...prev, [file.name]: v }))}
+                            options={TRANSPORTADORAS}
+                            disabled={isSaving}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveTransportadora(file)}
+                            disabled={isSaving || !isDirty}
+                            title="Salvar transportadora"
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40"
+                          >
+                            {isSaving
+                              ? <Loader2 size={13} className="animate-spin" />
+                              : <Save size={13} />}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <div className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleDownload(file)}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20"
+                          >
+                            <Download size={13} />
+                            Baixar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(file)}
+                            disabled={deletingFile === file.name}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+                          >
+                            {deletingFile === file.name
+                              ? <Loader2 size={13} className="animate-spin" />
+                              : <Trash2 size={13} />}
+                            Deletar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

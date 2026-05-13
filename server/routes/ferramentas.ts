@@ -38,6 +38,7 @@ router.get('/planilhas', async (_req: AuthRequest, res) => {
         size: Number(f.metadata.size || 0),
         updated: f.metadata.updated ?? null,
         contentType: f.metadata.contentType ?? null,
+        transportadora: (f.metadata as any).metadata?.transportadora ?? null,
       })),
     );
   } catch (err) {
@@ -91,6 +92,24 @@ router.post('/planilhas/delete', async (req: AuthRequest, res) => {
   } catch (err) {
     console.error('GCS delete error:', err);
     res.status(500).json({ error: 'Erro ao deletar arquivo.' });
+  }
+});
+
+router.post('/planilhas/metadata', async (req: AuthRequest, res) => {
+  try {
+    const filename = String(req.body?.file || '');
+    const transportadora = String(req.body?.transportadora ?? '');
+    if (!filename) {
+      res.status(400).json({ error: 'Arquivo nao informado.' });
+      return;
+    }
+    await gcs.bucket(BUCKET_NAME).file(filename).setMetadata({
+      metadata: { transportadora },
+    });
+    res.json({ updated: filename, transportadora });
+  } catch (err) {
+    console.error('GCS metadata error:', err);
+    res.status(500).json({ error: 'Erro ao atualizar metadados.' });
   }
 });
 

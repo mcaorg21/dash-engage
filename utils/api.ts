@@ -42,6 +42,7 @@ export interface BucketFile {
   size: number;
   updated: string | null;
   contentType: string | null;
+  transportadora: string | null;
 }
 
 export interface QivezDashboardMonth {
@@ -134,5 +135,11 @@ export const api = {
     request<{ deleted: string }>('/ferramentas/planilhas/delete', {
       method: 'POST',
       body: JSON.stringify({ file: filename }),
+    }),
+
+  updatePlanilhaMetadata: (filename: string, transportadora: string) =>
+    request<{ updated: string; transportadora: string }>('/ferramentas/planilhas/metadata', {
+      method: 'POST',
+      body: JSON.stringify({ file: filename, transportadora }),
     }),
 };
