@@ -214,7 +214,7 @@ router.get('/planilhas/extract', async (_req: AuthRequest, res) => {
         const matched = headers.find(h => savedNames.has(h));
         if (!matched) continue;
 
-        const transportadora: string = (file.metadata as any).metadata?.transportadora ?? file.name;
+        const transportadora: string = (file.metadata as any).metadata?.transportadora || 'indefinida';
         for (const valor of parseSheetColumn(buffer, matched)) {
           results.push({ transportadora, arquivo: file.name, coluna: matched, valor });
         }
