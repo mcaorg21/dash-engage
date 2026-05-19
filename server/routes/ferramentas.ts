@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { authenticate, type AuthRequest } from '../middleware/auth.js';
+import { pool } from '../db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
@@ -56,20 +57,35 @@ function parseSheetColumn(buffer: Buffer, column: string): unknown[] {
   }
 }
 
+async function getMappingsMap(): Promise<Record<string, string>> {
+  const { rows } = await pool.query<{ transportadora: string; column_mapping: string }>(
+    'SELECT transportadora, column_mapping FROM transportadora_column_mappings',
+  );
+  return Object.fromEntries(rows.map(r => [r.transportadora, r.column_mapping]));
+}
+
 router.use(authenticate);
+
+// ── Planilhas (GCS files) ─────────────────────────────────────────────────────
 
 router.get('/planilhas', async (_req: AuthRequest, res) => {
   try {
-    const [files] = await gcs.bucket(BUCKET_NAME).getFiles();
+    const [[files], mappings] = await Promise.all([
+      gcs.bucket(BUCKET_NAME).getFiles(),
+      getMappingsMap(),
+    ]);
     res.json(
-      files.map(f => ({
-        name: f.name,
-        size: Number(f.metadata.size || 0),
-        updated: f.metadata.updated ?? null,
-        contentType: f.metadata.contentType ?? null,
-        transportadora: (f.metadata as any).metadata?.transportadora ?? null,
-        columnMapping: (f.metadata as any).metadata?.columnMapping ?? null,
-      })),
+      files.map(f => {
+        const transportadora: string | null = (f.metadata as any).metadata?.transportadora ?? null;
+        return {
+          name: f.name,
+          size: Number(f.metadata.size || 0),
+          updated: f.metadata.updated ?? null,
+          contentType: f.metadata.contentType ?? null,
+          transportadora,
+          columnMapping: transportadora ? (mappings[transportadora] ?? null) : null,
+        };
+      }),
     );
   } catch (err) {
     console.error('GCS list error:', err);
@@ -84,9 +100,7 @@ router.post('/planilhas/upload', upload.array('files'), async (req: AuthRequest,
       res.status(400).json({ error: 'Nenhum arquivo enviado.' });
       return;
     }
-
     const bucket = gcs.bucket(BUCKET_NAME);
-
     await Promise.all(
       files.map(
         file =>
@@ -102,7 +116,6 @@ router.post('/planilhas/upload', upload.array('files'), async (req: AuthRequest,
           }),
       ),
     );
-
     res.json({ uploaded: files.map(f => f.originalname) });
   } catch (err) {
     console.error('GCS upload error:', err);
@@ -125,6 +138,7 @@ router.post('/planilhas/delete', async (req: AuthRequest, res) => {
   }
 });
 
+// Saves transportadora to GCS file metadata (per-file association)
 router.post('/planilhas/metadata', async (req: AuthRequest, res) => {
   try {
     const filename = String(req.body?.file || '');
@@ -134,7 +148,6 @@ router.post('/planilhas/metadata', async (req: AuthRequest, res) => {
     }
     const updates: Record<string, string> = {};
     if (req.body.transportadora !== undefined) updates.transportadora = String(req.body.transportadora);
-    if (req.body.columnMapping !== undefined) updates.columnMapping = String(req.body.columnMapping);
     if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: 'Nenhum campo para atualizar.' });
       return;
@@ -155,8 +168,7 @@ router.get('/planilhas/columns', async (req: AuthRequest, res) => {
       return;
     }
     const [buffer] = await gcs.bucket(BUCKET_NAME).file(filename).download();
-    const headers = parseSheetHeaders(buffer);
-    res.json(headers);
+    res.json(parseSheetHeaders(buffer));
   } catch (err) {
     console.error('GCS columns error:', err);
     res.status(500).json({ error: 'Erro ao ler colunas do arquivo.' });
@@ -165,24 +177,21 @@ router.get('/planilhas/columns', async (req: AuthRequest, res) => {
 
 router.get('/planilhas/extract', async (_req: AuthRequest, res) => {
   try {
-    const [files] = await gcs.bucket(BUCKET_NAME).getFiles();
-
-    const mapped = files.filter(f => {
-      const meta = (f.metadata as any).metadata;
-      return meta?.columnMapping;
-    });
+    const [[files], mappings] = await Promise.all([
+      gcs.bucket(BUCKET_NAME).getFiles(),
+      getMappingsMap(),
+    ]);
 
     const results: Array<{ transportadora: string; arquivo: string; valor: unknown }> = [];
 
-    for (const file of mapped) {
-      const meta = (file.metadata as any).metadata ?? {};
-      const column: string = meta.columnMapping;
-      const transportadora: string = meta.transportadora ?? file.name;
+    for (const file of files) {
+      const transportadora: string = (file.metadata as any).metadata?.transportadora ?? file.name;
+      const column = mappings[transportadora];
+      if (!column) continue;
 
       try {
         const [buffer] = await gcs.bucket(BUCKET_NAME).file(file.name).download();
-        const values = parseSheetColumn(buffer, column);
-        for (const valor of values) {
+        for (const valor of parseSheetColumn(buffer, column)) {
           results.push({ transportadora, arquivo: file.name, valor });
         }
       } catch (err) {
@@ -212,6 +221,54 @@ router.get('/planilhas/download', async (req: AuthRequest, res) => {
   } catch (err) {
     console.error('GCS download error:', err);
     res.status(500).json({ error: 'Erro ao baixar arquivo.' });
+  }
+});
+
+// ── Mapeamentos (DB — por transportadora) ─────────────────────────────────────
+
+router.get('/mapeamentos', async (_req: AuthRequest, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT transportadora, column_mapping AS "columnMapping", updated_at AS "updatedAt" FROM transportadora_column_mappings ORDER BY transportadora',
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('DB mapeamentos error:', err);
+    res.status(500).json({ error: 'Erro ao buscar mapeamentos.' });
+  }
+});
+
+router.post('/mapeamentos', async (req: AuthRequest, res) => {
+  try {
+    const transportadora = String(req.body?.transportadora || '').trim();
+    const columnMapping = String(req.body?.columnMapping || '').trim();
+    if (!transportadora || !columnMapping) {
+      res.status(400).json({ error: 'transportadora e columnMapping sao obrigatorios.' });
+      return;
+    }
+    const { rows } = await pool.query(
+      `INSERT INTO transportadora_column_mappings (transportadora, column_mapping, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (transportadora) DO UPDATE
+         SET column_mapping = EXCLUDED.column_mapping, updated_at = NOW()
+       RETURNING transportadora, column_mapping AS "columnMapping", updated_at AS "updatedAt"`,
+      [transportadora, columnMapping],
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('DB upsert mapeamento error:', err);
+    res.status(500).json({ error: 'Erro ao salvar mapeamento.' });
+  }
+});
+
+router.delete('/mapeamentos/:transportadora', async (req: AuthRequest, res) => {
+  try {
+    const transportadora = decodeURIComponent(req.params.transportadora);
+    await pool.query('DELETE FROM transportadora_column_mappings WHERE transportadora = $1', [transportadora]);
+    res.json({ deleted: transportadora });
+  } catch (err) {
+    console.error('DB delete mapeamento error:', err);
+    res.status(500).json({ error: 'Erro ao deletar mapeamento.' });
   }
 });
 

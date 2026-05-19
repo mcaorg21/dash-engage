@@ -52,6 +52,12 @@ export interface ExtractRow {
   valor: unknown;
 }
 
+export interface TransportadoraMapping {
+  transportadora: string;
+  columnMapping: string;
+  updatedAt: string;
+}
+
 export interface QivezDashboardMonth {
   mes: string;
   total: number;
@@ -144,7 +150,7 @@ export const api = {
       body: JSON.stringify({ file: filename }),
     }),
 
-  updatePlanilhaMetadata: (filename: string, fields: { transportadora?: string; columnMapping?: string }) =>
+  updatePlanilhaMetadata: (filename: string, fields: { transportadora?: string }) =>
     request<{ updated: string }>('/ferramentas/planilhas/metadata', {
       method: 'POST',
       body: JSON.stringify({ file: filename, ...fields }),
@@ -155,4 +161,18 @@ export const api = {
 
   extractPlanilhas: () =>
     request<ExtractRow[]>('/ferramentas/planilhas/extract'),
+
+  getMapeamentos: () =>
+    request<TransportadoraMapping[]>('/ferramentas/mapeamentos'),
+
+  saveColumnMapping: (transportadora: string, columnMapping: string) =>
+    request<TransportadoraMapping>('/ferramentas/mapeamentos', {
+      method: 'POST',
+      body: JSON.stringify({ transportadora, columnMapping }),
+    }),
+
+  deleteColumnMapping: (transportadora: string) =>
+    request<{ deleted: string }>(`/ferramentas/mapeamentos/${encodeURIComponent(transportadora)}`, {
+      method: 'DELETE',
+    }),
 };

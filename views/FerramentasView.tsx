@@ -54,10 +54,8 @@ function SearchableSelect({ value, onChange, options, disabled, placeholder = 'S
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (
-        !btnRef.current?.contains(e.target as Node) &&
-        !dropRef.current?.contains(e.target as Node)
-      ) setOpen(false);
+      if (!btnRef.current?.contains(e.target as Node) && !dropRef.current?.contains(e.target as Node))
+        setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -146,18 +144,17 @@ const PlanilhasView = () => {
   const [listError, setListError] = useState<string | null>(null);
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
 
-  // Transportadora state
+  // Transportadora state (per file, saved in GCS metadata)
   const [editTransportadoras, setEditTransportadoras] = useState<Record<string, string>>({});
   const [savingTransportadora, setSavingTransportadora] = useState<string | null>(null);
 
-  // Column mapping state
+  // Column mapping state (per transportadora, saved in DB)
+  const [editColumnMappings, setEditColumnMappings] = useState<Record<string, string>>({});
   const [fileColumns, setFileColumns] = useState<Record<string, string[] | undefined>>({});
   const [loadingColumns, setLoadingColumns] = useState<Record<string, boolean>>({});
-  const [editColumnMappings, setEditColumnMappings] = useState<Record<string, string>>({});
   const [savingColumnMapping, setSavingColumnMapping] = useState<string | null>(null);
 
   const [copiedUrl, setCopiedUrl] = useState(false);
-
   const { modal, alert, danger } = useModal();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -171,7 +168,14 @@ const PlanilhasView = () => {
       const sorted = data.sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''));
       setBucketFiles(sorted);
       setEditTransportadoras(Object.fromEntries(sorted.map(f => [f.name, f.transportadora ?? ''])));
-      setEditColumnMappings(Object.fromEntries(sorted.map(f => [f.name, f.columnMapping ?? ''])));
+      // Initialize column mappings keyed by transportadora (deduplicated)
+      const colMappings: Record<string, string> = {};
+      for (const f of sorted) {
+        if (f.transportadora && f.columnMapping && !colMappings[f.transportadora]) {
+          colMappings[f.transportadora] = f.columnMapping;
+        }
+      }
+      setEditColumnMappings(colMappings);
     } catch (err: any) {
       setListError(err.message || 'Erro ao listar arquivos.');
     } finally {
@@ -252,7 +256,11 @@ const PlanilhasView = () => {
     setSavingTransportadora(file.name);
     try {
       await api.updatePlanilhaMetadata(file.name, { transportadora });
-      setBucketFiles(prev => prev.map(f => f.name === file.name ? { ...f, transportadora } : f));
+      // Reflect the new columnMapping from DB (if this transportadora has one)
+      const existingMapping = editColumnMappings[transportadora] ?? null;
+      setBucketFiles(prev =>
+        prev.map(f => f.name === file.name ? { ...f, transportadora, columnMapping: existingMapping } : f),
+      );
     } catch (err: any) {
       await alert(err.message || 'Erro ao salvar transportadora.', 'Erro');
     } finally {
@@ -274,11 +282,16 @@ const PlanilhasView = () => {
   };
 
   const handleSaveColumnMapping = async (file: BucketFile) => {
-    const columnMapping = editColumnMappings[file.name] ?? '';
+    const transportadora = file.transportadora!;
+    const columnMapping = editColumnMappings[transportadora] ?? '';
+    if (!columnMapping) return;
     setSavingColumnMapping(file.name);
     try {
-      await api.updatePlanilhaMetadata(file.name, { columnMapping });
-      setBucketFiles(prev => prev.map(f => f.name === file.name ? { ...f, columnMapping } : f));
+      await api.saveColumnMapping(transportadora, columnMapping);
+      // Update all files that share this transportadora
+      setBucketFiles(prev =>
+        prev.map(f => f.transportadora === transportadora ? { ...f, columnMapping } : f),
+      );
     } catch (err: any) {
       await alert(err.message || 'Erro ao salvar mapeamento.', 'Erro');
     } finally {
@@ -300,14 +313,13 @@ const PlanilhasView = () => {
       <div>
         <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">Planilhas</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Envie planilhas de transportadoras para o repositorio e configure os mapeamentos de colunas.
+          Envie planilhas, associe transportadoras e configure quais colunas extrair para o n8n.
         </p>
       </div>
 
       {/* Upload area */}
       <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm space-y-4">
         <h2 className="text-base font-bold text-slate-800">Enviar arquivos</h2>
-
         <div
           className={`relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-12 transition-colors cursor-pointer
             ${isDragging
@@ -329,14 +341,8 @@ const PlanilhasView = () => {
               {ACCEPTED.join(', ')} — varios arquivos simultaneos
             </p>
           </div>
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            accept={ACCEPTED.join(',')}
-            className="hidden"
-            onChange={e => e.target.files && addFiles(e.target.files)}
-          />
+          <input ref={inputRef} type="file" multiple accept={ACCEPTED.join(',')} className="hidden"
+            onChange={e => e.target.files && addFiles(e.target.files)} />
         </div>
 
         {pendingFiles.length > 0 && (
@@ -352,43 +358,29 @@ const PlanilhasView = () => {
                     <span className="truncate text-sm font-medium text-slate-700">{f.name}</span>
                     <span className="shrink-0 text-xs text-slate-400">{formatBytes(f.size)}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={e => { e.stopPropagation(); removeFile(f.name); }}
-                    className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  >
+                  <button type="button" onClick={e => { e.stopPropagation(); removeFile(f.name); }}
+                    className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
                     <X size={14} />
                   </button>
                 </li>
               ))}
             </ul>
             <div className="flex items-center gap-3 pt-1">
-              <button
-                type="button"
-                onClick={handleUpload}
-                disabled={isUploading}
-                className="inline-flex items-center gap-2 rounded-lg bg-[var(--engage-blue-600)] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)] disabled:opacity-60"
-              >
+              <button type="button" onClick={handleUpload} disabled={isUploading}
+                className="inline-flex items-center gap-2 rounded-lg bg-[var(--engage-blue-600)] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)] disabled:opacity-60">
                 {isUploading
                   ? <><Loader2 size={15} className="animate-spin" /> Enviando...</>
                   : <><Upload size={15} /> Enviar {pendingFiles.length} arquivo{pendingFiles.length !== 1 ? 's' : ''}</>}
               </button>
-              <button
-                type="button"
-                onClick={() => setPendingFiles([])}
-                disabled={isUploading}
-                className="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-60"
-              >
+              <button type="button" onClick={() => setPendingFiles([])} disabled={isUploading}
+                className="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-60">
                 Limpar
               </button>
             </div>
           </div>
         )}
-
         {uploadError && (
-          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-            {uploadError}
-          </div>
+          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{uploadError}</div>
         )}
         {uploadSuccess && (
           <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
@@ -402,28 +394,20 @@ const PlanilhasView = () => {
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
             <h2 className="text-base font-bold text-slate-800">Repositorio</h2>
-            {mappedCount > 0 && (
+            {!isLoadingFiles && bucketFiles.length > 0 && (
               <p className="mt-0.5 text-xs text-slate-400">
                 {mappedCount} de {bucketFiles.length} arquivo{bucketFiles.length !== 1 ? 's' : ''} com coluna mapeada
               </p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={loadFiles}
-            disabled={isLoadingFiles}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40"
-          >
+          <button type="button" onClick={loadFiles} disabled={isLoadingFiles}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40">
             <Loader2 size={16} className={isLoadingFiles ? 'animate-spin' : ''} />
           </button>
         </div>
 
-        {isLoadingFiles && (
-          <div className="p-8 text-sm font-medium text-slate-500">Carregando arquivos...</div>
-        )}
-        {listError && (
-          <div className="p-8 text-sm font-medium text-red-600">{listError}</div>
-        )}
+        {isLoadingFiles && <div className="p-8 text-sm font-medium text-slate-500">Carregando arquivos...</div>}
+        {listError && <div className="p-8 text-sm font-medium text-red-600">{listError}</div>}
         {!isLoadingFiles && !listError && bucketFiles.length === 0 && (
           <div className="p-8 text-sm font-medium text-slate-500">Nenhum arquivo no repositorio.</div>
         )}
@@ -443,14 +427,15 @@ const PlanilhasView = () => {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {bucketFiles.map(file => {
-                  const currentEdit = editTransportadoras[file.name] ?? '';
-                  const savedValue = file.transportadora ?? '';
-                  const isTranspDirty = currentEdit !== savedValue;
+                  const transpEdit = editTransportadoras[file.name] ?? '';
+                  const transpSaved = file.transportadora ?? '';
+                  const isTranspDirty = transpEdit !== transpSaved;
                   const isTranspSaving = savingTransportadora === file.name;
 
-                  const cols = fileColumns[file.name];
+                  const activeTransp = file.transportadora;
+                  const cols = activeTransp ? fileColumns[file.name] : undefined;
                   const isLoadingCols = loadingColumns[file.name] ?? false;
-                  const colEdit = editColumnMappings[file.name] ?? '';
+                  const colEdit = activeTransp ? (editColumnMappings[activeTransp] ?? '') : '';
                   const savedCol = file.columnMapping ?? '';
                   const isColDirty = colEdit !== savedCol;
                   const isColSaving = savingColumnMapping === file.name;
@@ -459,9 +444,7 @@ const PlanilhasView = () => {
                     <tr key={file.name} className="hover:bg-slate-50/70">
                       <td className="flex items-center gap-2 whitespace-nowrap px-4 py-3">
                         <FileSpreadsheet size={15} className="shrink-0 text-emerald-500" />
-                        <span className="max-w-[260px] truncate font-medium text-slate-700" title={file.name}>
-                          {file.name}
-                        </span>
+                        <span className="max-w-[240px] truncate font-medium text-slate-700" title={file.name}>{file.name}</span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatBytes(file.size)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatDate(file.updated)}</td>
@@ -470,19 +453,15 @@ const PlanilhasView = () => {
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex items-center gap-2">
                           <SearchableSelect
-                            value={currentEdit}
+                            value={transpEdit}
                             onChange={v => setEditTransportadoras(prev => ({ ...prev, [file.name]: v }))}
                             options={TRANSPORTADORAS}
                             disabled={isTranspSaving}
-                            placeholder="Selecionar transportadora..."
+                            placeholder="Selecionar..."
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleSaveTransportadora(file)}
-                            disabled={isTranspSaving || !isTranspDirty}
-                            title="Salvar transportadora"
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40"
-                          >
+                          <button type="button" onClick={() => handleSaveTransportadora(file)}
+                            disabled={isTranspSaving || !isTranspDirty} title="Salvar transportadora"
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40">
                             {isTranspSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                           </button>
                         </div>
@@ -490,58 +469,50 @@ const PlanilhasView = () => {
 
                       {/* Coluna mapeada */}
                       <td className="whitespace-nowrap px-4 py-3">
-                        {cols === undefined ? (
+                        {!activeTransp ? (
+                          <span className="text-xs text-slate-400 italic">Atribua uma transportadora primeiro</span>
+                        ) : cols === undefined ? (
                           <div className="flex items-center gap-2">
                             {savedCol && (
-                              <span
-                                className="max-w-[140px] truncate rounded-md bg-[var(--engage-blue-400)]/10 px-2 py-1 text-xs font-medium text-[var(--engage-blue-700)]"
-                                title={savedCol}
-                              >
+                              <span className="max-w-[130px] truncate rounded-md bg-[var(--engage-blue-400)]/10 px-2 py-1 text-xs font-medium text-[var(--engage-blue-700)]" title={savedCol}>
                                 {savedCol}
                               </span>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => fetchColumns(file.name)}
-                              disabled={isLoadingCols}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
-                            >
-                              {isLoadingCols
-                                ? <Loader2 size={12} className="animate-spin" />
-                                : <Search size={12} />}
+                            <button type="button" onClick={() => fetchColumns(file.name)} disabled={isLoadingCols}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50">
+                              {isLoadingCols ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
                               {savedCol ? 'Alterar' : 'Detectar colunas'}
                             </button>
                           </div>
                         ) : cols.length === 0 ? (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-red-500">Sem colunas detectadas</span>
-                            <button
-                              type="button"
+                            <button type="button"
                               onClick={() => setFileColumns(prev => { const n = { ...prev }; delete n[file.name]; return n; })}
-                              className="text-xs text-slate-400 underline hover:text-slate-600"
-                            >
+                              className="text-xs text-slate-400 underline hover:text-slate-600">
                               Tentar novamente
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2">
-                            <SearchableSelect
-                              value={colEdit}
-                              onChange={v => setEditColumnMappings(prev => ({ ...prev, [file.name]: v }))}
-                              options={cols}
-                              disabled={isColSaving}
-                              placeholder="Selecionar coluna..."
-                              width="w-44"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleSaveColumnMapping(file)}
-                              disabled={isColSaving || !isColDirty}
-                              title="Salvar mapeamento de coluna"
-                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40"
-                            >
-                              {isColSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                            </button>
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2">
+                              <SearchableSelect
+                                value={colEdit}
+                                onChange={v => setEditColumnMappings(prev => ({ ...prev, [activeTransp]: v }))}
+                                options={cols}
+                                disabled={isColSaving}
+                                placeholder="Selecionar coluna..."
+                                width="w-44"
+                              />
+                              <button type="button" onClick={() => handleSaveColumnMapping(file)}
+                                disabled={isColSaving || !isColDirty} title="Salvar mapeamento"
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40">
+                                {isColSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-slate-400">
+                              Aplica-se a todas as planilhas de <span className="font-semibold">{activeTransp}</span>
+                            </p>
                           </div>
                         )}
                       </td>
@@ -549,23 +520,13 @@ const PlanilhasView = () => {
                       {/* Acoes */}
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <div className="inline-flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleDownload(file)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20"
-                          >
-                            <Download size={13} />
-                            Baixar
+                          <button type="button" onClick={() => handleDownload(file)}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20">
+                            <Download size={13} /> Baixar
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(file)}
-                            disabled={deletingFile === file.name}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
-                          >
-                            {deletingFile === file.name
-                              ? <Loader2 size={13} className="animate-spin" />
-                              : <Trash2 size={13} />}
+                          <button type="button" onClick={() => handleDelete(file)} disabled={deletingFile === file.name}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50">
+                            {deletingFile === file.name ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                             Deletar
                           </button>
                         </div>
@@ -579,19 +540,18 @@ const PlanilhasView = () => {
         )}
       </div>
 
-      {/* n8n endpoint info */}
+      {/* n8n endpoint */}
       <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm space-y-4">
         <div>
           <h2 className="text-base font-bold text-slate-800">Endpoint para n8n</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Use este endpoint no n8n para obter todos os valores das colunas mapeadas.
-            Retorna um array de{' '}
+            Retorna todos os valores das colunas mapeadas como{' '}
             <code className="rounded bg-slate-100 px-1 py-0.5 text-xs font-mono text-slate-700">
-              {'{ transportadora, arquivo, valor }'}
+              {'[{ transportadora, arquivo, valor }]'}
             </code>.
+            Os mapeamentos sao lidos do banco de dados — qualquer nova planilha da mesma transportadora ja e processada automaticamente.
           </p>
         </div>
-
         <div className="space-y-3">
           <div>
             <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">URL</p>
@@ -599,38 +559,30 @@ const PlanilhasView = () => {
               <code className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-mono text-slate-700 select-all">
                 GET {extractUrl}
               </code>
-              <button
-                type="button"
-                onClick={handleCopyUrl}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
-              >
+              <button type="button" onClick={handleCopyUrl}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50">
                 <Copy size={13} />
                 {copiedUrl ? 'Copiado!' : 'Copiar'}
               </button>
             </div>
           </div>
-
           <div>
             <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Header obrigatorio</p>
             <code className="block rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-mono text-slate-700">
               Authorization: Bearer {'<seu-token>'}
             </code>
           </div>
-
           <div>
             <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Exemplo de resposta</p>
-            <pre className="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-mono text-slate-700">
-{`[
-  { "transportadora": "BRASPRESS", "arquivo": "braspress.xlsx", "valor": "35123456789012345678901234567890123456789012345" },
-  { "transportadora": "BRASPRESS", "arquivo": "braspress.xlsx", "valor": "35987654321098765432109876543210987654321098765" },
-  { "transportadora": "JADLOG",    "arquivo": "jadlog_abril.xlsx", "valor": "35111111111111111111111111111111111111111111111" }
-]`}
-            </pre>
+            <pre className="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-mono text-slate-700">{`[
+  { "transportadora": "BRASPRESS", "arquivo": "braspress_maio.xlsx", "valor": "35123456789012345678901234567890123456789012345" },
+  { "transportadora": "BRASPRESS", "arquivo": "braspress_maio.xlsx", "valor": "35987654321098765432109876543210987654321098765" },
+  { "transportadora": "JADLOG",    "arquivo": "jadlog_abril.xlsx",   "valor": "35111111111111111111111111111111111111111111111" }
+]`}</pre>
           </div>
-
-          {mappedCount === 0 && (
+          {mappedCount === 0 && !isLoadingFiles && (
             <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-700">
-              Nenhum arquivo tem coluna mapeada ainda. Configure o mapeamento na tabela acima para que o endpoint retorne dados.
+              Nenhum arquivo tem coluna mapeada. Configure a coluna na tabela acima para que o endpoint retorne dados.
             </div>
           )}
           {mappedCount > 0 && (

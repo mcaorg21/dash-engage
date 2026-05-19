@@ -25,6 +25,12 @@ export async function initDb() {
       permissions   TEXT[]       NOT NULL DEFAULT '{}',
       created_at    TIMESTAMP    NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS transportadora_column_mappings (
+      transportadora TEXT        PRIMARY KEY,
+      column_mapping TEXT        NOT NULL,
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
   console.log('Database initialized');
 }
