@@ -43,19 +43,13 @@ export interface BucketFile {
   updated: string | null;
   contentType: string | null;
   transportadora: string | null;
-  columnMapping: string | null;
 }
 
 export interface ExtractRow {
   transportadora: string;
   arquivo: string;
+  coluna: string;
   valor: unknown;
-}
-
-export interface FileMapping {
-  fileName: string;
-  columnMapping: string;
-  updatedAt: string;
 }
 
 export interface QivezDashboardMonth {
@@ -163,16 +157,16 @@ export const api = {
     request<ExtractRow[]>('/ferramentas/planilhas/extract'),
 
   getMapeamentos: () =>
-    request<FileMapping[]>('/ferramentas/mapeamentos'),
+    request<string[]>('/ferramentas/mapeamentos'),
 
-  saveColumnMapping: (fileName: string, columnMapping: string) =>
-    request<FileMapping>('/ferramentas/mapeamentos', {
+  saveColumnName: (columnName: string) =>
+    request<{ saved: string }>('/ferramentas/mapeamentos', {
       method: 'POST',
-      body: JSON.stringify({ fileName, columnMapping }),
+      body: JSON.stringify({ columnName }),
     }),
 
-  deleteColumnMapping: (fileName: string) =>
-    request<{ deleted: string }>(`/ferramentas/mapeamentos/${encodeURIComponent(fileName)}`, {
+  deleteColumnName: (columnName: string) =>
+    request<{ deleted: string }>(`/ferramentas/mapeamentos/${encodeURIComponent(columnName)}`, {
       method: 'DELETE',
     }),
 };
