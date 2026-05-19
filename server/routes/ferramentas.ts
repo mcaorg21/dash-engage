@@ -58,11 +58,11 @@ function parseSheetHeaders(buffer: Buffer): string[] {
 
 function parseSheetColumn(buffer: Buffer, column: string): unknown[] {
   try {
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellText: true });
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) return [];
     const sheet = workbook.Sheets[sheetName];
-    const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null });
+    const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: false });
 
     // Find the header row that contains the target column (scan up to 30 rows)
     let headerRowIdx = -1;
