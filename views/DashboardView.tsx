@@ -10,6 +10,7 @@ const INTERNAL_LOGO_SRC = '/logo/white-logo.7e189ed.webp';
 const qivezTabs = [
   { id: 'conciliacao_qivez_painel', label: 'Painel', icon: LayoutDashboard },
   { id: 'conciliacao_qivez_listar', label: 'Listar', icon: List },
+  { id: 'conciliacao_qivez_canceladas', label: 'Canceladas', icon: XCircle },
   { id: 'conciliacao_qivez_importar', label: 'Importar', icon: Upload },
 ];
 
@@ -25,6 +26,10 @@ const qivezTitles: Record<string, { title: string; description: string }> = {
   conciliacao_qivez_listar: {
     title: 'CTe - Listar',
     description: 'Listagem de registros da conciliacao CTe.',
+  },
+  conciliacao_qivez_canceladas: {
+    title: 'CTe - Canceladas',
+    description: 'Listagem de lancamentos com cancelada = true.',
   },
   conciliacao_qivez_importar: {
     title: 'CTe - Importar',
@@ -746,6 +751,126 @@ const QivezListarView = () => {
   );
 };
 
+const QivezCanceladasView = () => {
+  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [chaveCte, setChaveCte] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveCte: '' });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRows = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await api.getQivezCanceladas(appliedFilters);
+        if (!cancelled) setRows(data);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Erro ao carregar canceladas.');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadRows();
+    return () => { cancelled = true; };
+  }, [appliedFilters]);
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">CTe - Canceladas</h1>
+        <p className="mt-1 text-sm text-slate-500">Lancamentos marcados como cancelados.</p>
+      </div>
+
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-6 py-4">
+          <form
+            className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(220px,1.4fr)_auto_auto_auto] lg:items-end"
+            onSubmit={event => {
+              event.preventDefault();
+              setAppliedFilters({ dataInicio, dataFim, chaveCte: chaveCte.trim() });
+            }}
+          >
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Inicio</label>
+              <input type="date" value={dataInicio} onChange={event => setDataInicio(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Fim</label>
+              <input type="date" value={dataFim} onChange={event => setDataFim(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Chave CTE</label>
+              <input type="search" value={chaveCte} onChange={event => setChaveCte(event.target.value)}
+                placeholder="Buscar pela chave"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
+              Filtrar
+            </button>
+            <button type="button" className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100"
+              onClick={() => { setDataInicio(''); setDataFim(''); setChaveCte(''); setAppliedFilters({ dataInicio: '', dataFim: '', chaveCte: '' }); }}>
+              Limpar
+            </button>
+            <button type="button" disabled={rows.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--engage-blue-400)]/10 px-4 py-2 text-sm font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => downloadFilteredXmlZip(rows)}>
+              <Download size={16} /> Baixar filtrados
+            </button>
+          </form>
+        </div>
+
+        {isLoading && <div className="p-8 text-sm font-medium text-slate-500">Carregando canceladas...</div>}
+        {error && <div className="p-8 text-sm font-medium text-red-600">{error}</div>}
+        {!isLoading && !error && rows.length === 0 && (
+          <div className="p-8 text-sm font-medium text-slate-500">Nenhum lancamento cancelado encontrado.</div>
+        )}
+
+        {!isLoading && !error && rows.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-max border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data de lancamento</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Chave CTE</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tipo</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Download</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {rows.map((row, rowIndex) => (
+                  <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_lancamento)}</td>
+                    <td className="max-w-[360px] truncate whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={formatCellValue(row.chave_cte)}>
+                      {formatCellValue(row.chave_cte)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatCellValue(row.tipo)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(row.valor)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <button type="button" disabled={!row.json_xml} onClick={() => downloadXml(row)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40">
+                        <Download size={14} /> XML
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -969,7 +1094,11 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
             <QivezPainelView />
           )}
 
-          {activeTab !== 'conciliacao_qivez_listar' && activeTab !== 'conciliacao_qivez_painel' && qivezTabs.some(tab => tab.id === activeTab) && hasPermission(activeTab) && (
+          {activeTab === 'conciliacao_qivez_canceladas' && hasPermission('conciliacao_qivez_canceladas') && (
+            <QivezCanceladasView />
+          )}
+
+          {activeTab !== 'conciliacao_qivez_listar' && activeTab !== 'conciliacao_qivez_painel' && activeTab !== 'conciliacao_qivez_canceladas' && qivezTabs.some(tab => tab.id === activeTab) && hasPermission(activeTab) && (
             <QivezPlaceholderView tab={activeTab} />
           )}
 

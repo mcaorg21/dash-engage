@@ -115,6 +115,15 @@ export const api = {
     return request<QivezLancamento[]>(`/qivez/lancamentos${query ? `?${query}` : ''}`);
   },
 
+  getQivezCanceladas: (filters: { dataInicio?: string; dataFim?: string; chaveCte?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
+    if (filters.dataFim) params.set('dataFim', filters.dataFim);
+    if (filters.chaveCte) params.set('chaveCte', filters.chaveCte);
+    const query = params.toString();
+    return request<QivezLancamento[]>(`/qivez/canceladas${query ? `?${query}` : ''}`);
+  },
+
   getQivezDashboard: () => request<QivezDashboardResponse>('/qivez/dashboard'),
 
   getPlanilhas: () => request<BucketFile[]>('/ferramentas/planilhas'),

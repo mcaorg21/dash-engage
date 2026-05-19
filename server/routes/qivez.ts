@@ -106,4 +106,51 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
   }
 });
 
+router.get('/canceladas', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_qivez_canceladas');
+    if (!allowed) {
+      res.status(403).json({ error: 'Acesso negado' });
+      return;
+    }
+
+    const { dataInicio, dataFim, chaveCte } = req.query;
+    const filters = ['cancelada = true'];
+    const values: string[] = [];
+
+    if (typeof dataInicio === 'string' && dataInicio) {
+      values.push(dataInicio);
+      filters.push(`data_lancamento::date >= $${values.length}`);
+    }
+
+    if (typeof dataFim === 'string' && dataFim) {
+      values.push(dataFim);
+      filters.push(`data_lancamento::date <= $${values.length}`);
+    }
+
+    if (typeof chaveCte === 'string' && chaveCte.trim()) {
+      values.push(`%${chaveCte.trim()}%`);
+      filters.push(`chave_cte ILIKE $${values.length}`);
+    }
+
+    const result = await pool.query(`
+      SELECT
+        id,
+        data_lancamento,
+        chave_cte,
+        tipo,
+        diferenca_valor AS valor,
+        json_xml
+      FROM public.lancamentos_financeiros
+      WHERE ${filters.join(' AND ')}
+      ORDER BY id ASC
+    `, values);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Qivez canceladas list error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 export default router;
