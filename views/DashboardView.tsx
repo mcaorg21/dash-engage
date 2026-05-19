@@ -15,7 +15,7 @@ const qivezTabs = [
 ];
 
 const ferramentasTabs = [
-  { id: 'ferramentas_planilhas', label: 'Planilhas', icon: FileSpreadsheet },
+  { id: 'ferramentas_planilhas', label: 'Planilhas Transportadoras', icon: FileSpreadsheet },
 ];
 
 const qivezTitles: Record<string, { title: string; description: string }> = {
