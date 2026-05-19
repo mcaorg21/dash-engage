@@ -43,6 +43,13 @@ export interface BucketFile {
   updated: string | null;
   contentType: string | null;
   transportadora: string | null;
+  columnMapping: string | null;
+}
+
+export interface ExtractRow {
+  transportadora: string;
+  arquivo: string;
+  valor: unknown;
 }
 
 export interface QivezDashboardMonth {
@@ -137,9 +144,15 @@ export const api = {
       body: JSON.stringify({ file: filename }),
     }),
 
-  updatePlanilhaMetadata: (filename: string, transportadora: string) =>
-    request<{ updated: string; transportadora: string }>('/ferramentas/planilhas/metadata', {
+  updatePlanilhaMetadata: (filename: string, fields: { transportadora?: string; columnMapping?: string }) =>
+    request<{ updated: string }>('/ferramentas/planilhas/metadata', {
       method: 'POST',
-      body: JSON.stringify({ file: filename, transportadora }),
+      body: JSON.stringify({ file: filename, ...fields }),
     }),
+
+  getPlanilhaColumns: (filename: string) =>
+    request<string[]>(`/ferramentas/planilhas/columns?file=${encodeURIComponent(filename)}`),
+
+  extractPlanilhas: () =>
+    request<ExtractRow[]>('/ferramentas/planilhas/extract'),
 };
