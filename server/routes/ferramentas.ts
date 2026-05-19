@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response, type NextFunction } from 'express';
 import multer from 'multer';
 import { Storage } from '@google-cloud/storage';
 import * as XLSX from 'xlsx';
@@ -87,6 +87,60 @@ function parseSheetColumn(buffer: Buffer, column: string): unknown[] {
     return [];
   }
 }
+
+function apiKeyOrJwt(req: AuthRequest, res: Response, next: NextFunction) {
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey) {
+    const expected = process.env.EXTRACT_API_KEY;
+    if (!expected || apiKey !== expected) {
+      res.status(401).json({ error: 'API key invalida.' });
+      return;
+    }
+    return next();
+  }
+  authenticate(req, res, next);
+}
+
+async function handleExtract(_req: AuthRequest, res: Response) {
+  try {
+    const { rows } = await pool.query<{ column_name: string }>(
+      'SELECT column_name FROM saved_column_names',
+    );
+    const savedNames = new Set(rows.map(r => r.column_name));
+
+    if (savedNames.size === 0) {
+      res.json([]);
+      return;
+    }
+
+    const [files] = await gcs.bucket(BUCKET_NAME).getFiles();
+    const results: Array<{ transportadora: string; arquivo: string; coluna: string; valor: unknown }> = [];
+
+    for (const file of files) {
+      try {
+        const [buffer] = await gcs.bucket(BUCKET_NAME).file(file.name).download();
+        const headers = parseSheetHeaders(buffer);
+        const matched = headers.find(h => savedNames.has(h));
+        if (!matched) continue;
+
+        const transportadora: string = (file.metadata as any).metadata?.transportadora || 'indefinida';
+        for (const valor of parseSheetColumn(buffer, matched)) {
+          results.push({ transportadora, arquivo: file.name, coluna: matched, valor });
+        }
+      } catch (err) {
+        console.error(`Erro ao processar ${file.name}:`, err);
+      }
+    }
+
+    res.json(results);
+  } catch (err) {
+    console.error('Extract error:', err);
+    res.status(500).json({ error: 'Erro ao extrair dados das planilhas.' });
+  }
+}
+
+// Extract aceita JWT ou X-API-Key estatica (para n8n)
+router.get('/planilhas/extract', apiKeyOrJwt, handleExtract);
 
 router.use(authenticate);
 
@@ -188,45 +242,6 @@ router.get('/planilhas/columns', async (req: AuthRequest, res) => {
   } catch (err) {
     console.error('GCS columns error:', err);
     res.status(500).json({ error: 'Erro ao ler colunas do arquivo.' });
-  }
-});
-
-// Extract: for each file, auto-matches any saved column name found in its headers
-router.get('/planilhas/extract', async (_req: AuthRequest, res) => {
-  try {
-    const { rows } = await pool.query<{ column_name: string }>(
-      'SELECT column_name FROM saved_column_names',
-    );
-    const savedNames = new Set(rows.map(r => r.column_name));
-
-    if (savedNames.size === 0) {
-      res.json([]);
-      return;
-    }
-
-    const [files] = await gcs.bucket(BUCKET_NAME).getFiles();
-    const results: Array<{ transportadora: string; arquivo: string; coluna: string; valor: unknown }> = [];
-
-    for (const file of files) {
-      try {
-        const [buffer] = await gcs.bucket(BUCKET_NAME).file(file.name).download();
-        const headers = parseSheetHeaders(buffer);
-        const matched = headers.find(h => savedNames.has(h));
-        if (!matched) continue;
-
-        const transportadora: string = (file.metadata as any).metadata?.transportadora || 'indefinida';
-        for (const valor of parseSheetColumn(buffer, matched)) {
-          results.push({ transportadora, arquivo: file.name, coluna: matched, valor });
-        }
-      } catch (err) {
-        console.error(`Erro ao processar ${file.name}:`, err);
-      }
-    }
-
-    res.json(results);
-  } catch (err) {
-    console.error('Extract error:', err);
-    res.status(500).json({ error: 'Erro ao extrair dados das planilhas.' });
   }
 });
 

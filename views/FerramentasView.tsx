@@ -594,8 +594,9 @@ const PlanilhasView = () => {
           <div>
             <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Header obrigatorio</p>
             <code className="block rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-mono text-slate-700">
-              Authorization: Bearer {'<seu-token>'}
+              X-API-Key: {'<EXTRACT_API_KEY>'}
             </code>
+            <p className="mt-1 text-xs text-slate-400">Defina a variavel de ambiente <span className="font-mono">EXTRACT_API_KEY</span> no servidor com o valor que desejar.</p>
           </div>
           <div>
             <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Exemplo de resposta</p>
