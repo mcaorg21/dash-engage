@@ -225,6 +225,7 @@ const PlanilhasView = () => {
       setUploadSuccess(result.uploaded);
       setPendingFiles([]);
       await loadFiles();
+      result.uploaded.forEach(filename => fetchColumns(filename));
     } catch (err: any) {
       setUploadError(err.message || 'Erro ao fazer upload.');
     } finally {
