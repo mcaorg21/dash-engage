@@ -168,14 +168,7 @@ const PlanilhasView = () => {
       const sorted = data.sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''));
       setBucketFiles(sorted);
       setEditTransportadoras(Object.fromEntries(sorted.map(f => [f.name, f.transportadora ?? ''])));
-      // Initialize column mappings keyed by transportadora (deduplicated)
-      const colMappings: Record<string, string> = {};
-      for (const f of sorted) {
-        if (f.transportadora && f.columnMapping && !colMappings[f.transportadora]) {
-          colMappings[f.transportadora] = f.columnMapping;
-        }
-      }
-      setEditColumnMappings(colMappings);
+      setEditColumnMappings(Object.fromEntries(sorted.map(f => [f.name, f.columnMapping ?? ''])));
     } catch (err: any) {
       setListError(err.message || 'Erro ao listar arquivos.');
     } finally {
@@ -282,15 +275,13 @@ const PlanilhasView = () => {
   };
 
   const handleSaveColumnMapping = async (file: BucketFile) => {
-    const transportadora = file.transportadora!;
-    const columnMapping = editColumnMappings[transportadora] ?? '';
+    const columnMapping = editColumnMappings[file.name] ?? '';
     if (!columnMapping) return;
     setSavingColumnMapping(file.name);
     try {
-      await api.saveColumnMapping(transportadora, columnMapping);
-      // Update all files that share this transportadora
+      await api.saveColumnMapping(file.name, columnMapping);
       setBucketFiles(prev =>
-        prev.map(f => f.transportadora === transportadora ? { ...f, columnMapping } : f),
+        prev.map(f => f.name === file.name ? { ...f, columnMapping } : f),
       );
     } catch (err: any) {
       await alert(err.message || 'Erro ao salvar mapeamento.', 'Erro');
@@ -432,10 +423,9 @@ const PlanilhasView = () => {
                   const isTranspDirty = transpEdit !== transpSaved;
                   const isTranspSaving = savingTransportadora === file.name;
 
-                  const activeTransp = file.transportadora;
-                  const cols = activeTransp ? fileColumns[file.name] : undefined;
+                  const cols = fileColumns[file.name];
                   const isLoadingCols = loadingColumns[file.name] ?? false;
-                  const colEdit = activeTransp ? (editColumnMappings[activeTransp] ?? '') : '';
+                  const colEdit = editColumnMappings[file.name] ?? '';
                   const savedCol = file.columnMapping ?? '';
                   const isColDirty = colEdit !== savedCol;
                   const isColSaving = savingColumnMapping === file.name;
@@ -469,9 +459,7 @@ const PlanilhasView = () => {
 
                       {/* Coluna mapeada */}
                       <td className="whitespace-nowrap px-4 py-3">
-                        {!activeTransp ? (
-                          <span className="text-xs text-slate-400 italic">Atribua uma transportadora primeiro</span>
-                        ) : cols === undefined ? (
+                        {cols === undefined ? (
                           <div className="flex items-center gap-2">
                             {savedCol && (
                               <span className="max-w-[130px] truncate rounded-md bg-[var(--engage-blue-400)]/10 px-2 py-1 text-xs font-medium text-[var(--engage-blue-700)]" title={savedCol}>
@@ -494,25 +482,20 @@ const PlanilhasView = () => {
                             </button>
                           </div>
                         ) : (
-                          <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2">
-                              <SearchableSelect
-                                value={colEdit}
-                                onChange={v => setEditColumnMappings(prev => ({ ...prev, [activeTransp]: v }))}
-                                options={cols}
-                                disabled={isColSaving}
-                                placeholder="Selecionar coluna..."
-                                width="w-44"
-                              />
-                              <button type="button" onClick={() => handleSaveColumnMapping(file)}
-                                disabled={isColSaving || !isColDirty} title="Salvar mapeamento"
-                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40">
-                                {isColSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                              </button>
-                            </div>
-                            <p className="text-[10px] text-slate-400">
-                              Aplica-se a todas as planilhas de <span className="font-semibold">{activeTransp}</span>
-                            </p>
+                          <div className="flex items-center gap-2">
+                            <SearchableSelect
+                              value={colEdit}
+                              onChange={v => setEditColumnMappings(prev => ({ ...prev, [file.name]: v }))}
+                              options={cols}
+                              disabled={isColSaving}
+                              placeholder="Selecionar coluna..."
+                              width="w-44"
+                            />
+                            <button type="button" onClick={() => handleSaveColumnMapping(file)}
+                              disabled={isColSaving || !isColDirty} title="Salvar mapeamento"
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40">
+                              {isColSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                            </button>
                           </div>
                         )}
                       </td>

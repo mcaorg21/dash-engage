@@ -26,8 +26,8 @@ export async function initDb() {
       created_at    TIMESTAMP    NOT NULL DEFAULT NOW()
     );
 
-    CREATE TABLE IF NOT EXISTS transportadora_column_mappings (
-      transportadora TEXT        PRIMARY KEY,
+    CREATE TABLE IF NOT EXISTS file_column_mappings (
+      file_name      TEXT        PRIMARY KEY,
       column_mapping TEXT        NOT NULL,
       updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );

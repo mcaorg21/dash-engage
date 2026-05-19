@@ -52,8 +52,8 @@ export interface ExtractRow {
   valor: unknown;
 }
 
-export interface TransportadoraMapping {
-  transportadora: string;
+export interface FileMapping {
+  fileName: string;
   columnMapping: string;
   updatedAt: string;
 }
@@ -163,16 +163,16 @@ export const api = {
     request<ExtractRow[]>('/ferramentas/planilhas/extract'),
 
   getMapeamentos: () =>
-    request<TransportadoraMapping[]>('/ferramentas/mapeamentos'),
+    request<FileMapping[]>('/ferramentas/mapeamentos'),
 
-  saveColumnMapping: (transportadora: string, columnMapping: string) =>
-    request<TransportadoraMapping>('/ferramentas/mapeamentos', {
+  saveColumnMapping: (fileName: string, columnMapping: string) =>
+    request<FileMapping>('/ferramentas/mapeamentos', {
       method: 'POST',
-      body: JSON.stringify({ transportadora, columnMapping }),
+      body: JSON.stringify({ fileName, columnMapping }),
     }),
 
-  deleteColumnMapping: (transportadora: string) =>
-    request<{ deleted: string }>(`/ferramentas/mapeamentos/${encodeURIComponent(transportadora)}`, {
+  deleteColumnMapping: (fileName: string) =>
+    request<{ deleted: string }>(`/ferramentas/mapeamentos/${encodeURIComponent(fileName)}`, {
       method: 'DELETE',
     }),
 };
