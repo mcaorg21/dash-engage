@@ -31,14 +31,17 @@ const gcs = createStorage();
 
 function parseSheetHeaders(buffer: Buffer): string[] {
   try {
-    const workbook = XLSX.read(buffer, { type: 'buffer', sheetRows: 1 });
+    const workbook = XLSX.read(buffer, { type: 'buffer', sheetRows: 30 });
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) return [];
     const sheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 });
-    const firstRow = rows[0];
-    if (!Array.isArray(firstRow)) return [];
-    return firstRow.map(String).filter(Boolean);
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null });
+    for (const row of rows) {
+      if (!Array.isArray(row)) continue;
+      const headers = row.map(v => (v != null ? String(v) : '')).filter(Boolean);
+      if (headers.length > 0) return headers;
+    }
+    return [];
   } catch {
     return [];
   }
