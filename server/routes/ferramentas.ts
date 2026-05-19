@@ -62,8 +62,27 @@ function parseSheetColumn(buffer: Buffer, column: string): unknown[] {
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) return [];
     const sheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
-    return rows.map(row => row[column] ?? null).filter(v => v !== null && v !== '');
+    const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null });
+
+    // Find the header row that contains the target column (scan up to 30 rows)
+    let headerRowIdx = -1;
+    let colIdx = -1;
+    for (let i = 0; i < Math.min(allRows.length, 30); i++) {
+      const row = allRows[i];
+      if (!Array.isArray(row)) continue;
+      const idx = row.findIndex(v => v != null && String(v).trim() === column);
+      if (idx !== -1) { headerRowIdx = i; colIdx = idx; break; }
+    }
+    if (headerRowIdx === -1) return [];
+
+    const values: unknown[] = [];
+    for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+      const row = allRows[i] as unknown[];
+      if (!Array.isArray(row)) continue;
+      const v = row[colIdx];
+      if (v !== null && v !== undefined && v !== '') values.push(v);
+    }
+    return values;
   } catch {
     return [];
   }
