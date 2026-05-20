@@ -581,19 +581,10 @@ const downloadFilteredXmlZip = async (rows: Record<string, unknown>[]) => {
   downloadBlobFile(blob, 'lancamentos-cte-filtrados.zip');
 };
 
-const SISTEMA_STYLES: Record<string, string> = {
-  qivez:   'bg-[var(--engage-blue-400)]/10 text-[var(--engage-blue-800)]',
-  sysemp:  'bg-emerald-50 text-emerald-700',
-  sap:     'bg-violet-50 text-violet-700',
-  totvs:   'bg-amber-50 text-amber-700',
-};
-
 const SistemaBadge = ({ value }: { value: unknown }) => {
-  const label = value ? String(value) : '—';
-  const key = label.toLowerCase();
-  const cls = SISTEMA_STYLES[key] ?? 'bg-slate-100 text-slate-600';
+  const label = value != null && String(value).trim() !== '' ? String(value) : '—';
   return (
-    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold ${cls}`}>
+    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
       {label}
     </span>
   );
