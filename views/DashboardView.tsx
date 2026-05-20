@@ -630,10 +630,28 @@ const downloadFilteredXmlZip = async (rows: Record<string, unknown>[]) => {
   downloadBlobFile(blob, 'lancamentos-cte-filtrados.zip');
 };
 
+const BADGE_PALETTE = [
+  'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+  'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+  'bg-violet-50 text-violet-700 ring-1 ring-violet-200',
+  'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+  'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+  'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200',
+  'bg-orange-50 text-orange-700 ring-1 ring-orange-200',
+  'bg-pink-50 text-pink-700 ring-1 ring-pink-200',
+];
+
+function sistemaBadgeClass(s: string): string {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) & 0xfffffff;
+  return BADGE_PALETTE[hash % BADGE_PALETTE.length];
+}
+
 const SistemaBadge = ({ value }: { value: unknown }) => {
-  const label = value != null && String(value).trim() !== '' ? String(value) : '—';
+  if (value == null || String(value).trim() === '') return <span className="text-slate-400">—</span>;
+  const label = String(value);
   return (
-    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold ${sistemaBadgeClass(label)}`}>
       {label}
     </span>
   );
@@ -646,7 +664,8 @@ const QivezListarView = () => {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [chaveCte, setChaveCte] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveCte: '' });
+  const [sistema, setSistema] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '' });
 
   useEffect(() => {
     let cancelled = false;
@@ -685,10 +704,10 @@ const QivezListarView = () => {
         <div className="border-b border-slate-100 px-6 py-4">
           <div className="w-full">
             <form
-              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(220px,1.4fr)_auto_auto_auto] lg:items-end"
+              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(160px,1fr)_auto_auto_auto] lg:items-end"
               onSubmit={event => {
                 event.preventDefault();
-                setAppliedFilters({ dataInicio, dataFim, chaveCte: chaveCte.trim() });
+                setAppliedFilters({ dataInicio, dataFim, chaveCte: chaveCte.trim(), sistema: sistema.trim() });
               }}
             >
               <div>
@@ -722,6 +741,17 @@ const QivezListarView = () => {
                 />
               </div>
 
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Origem</label>
+                <input
+                  type="search"
+                  value={sistema}
+                  onChange={event => setSistema(event.target.value)}
+                  placeholder="Filtrar origem"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                />
+              </div>
+
               <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
                 Filtrar
               </button>
@@ -733,7 +763,8 @@ const QivezListarView = () => {
                   setDataInicio('');
                   setDataFim('');
                   setChaveCte('');
-                  setAppliedFilters({ dataInicio: '', dataFim: '', chaveCte: '' });
+                  setSistema('');
+                  setAppliedFilters({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '' });
                 }}
               >
                 Limpar

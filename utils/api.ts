@@ -105,11 +105,12 @@ export const api = {
       method: 'DELETE',
     }),
 
-  getQivezLancamentos: (filters: { dataInicio?: string; dataFim?: string; chaveCte?: string } = {}) => {
+  getQivezLancamentos: (filters: { dataInicio?: string; dataFim?: string; chaveCte?: string; sistema?: string } = {}) => {
     const params = new URLSearchParams();
     if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
     if (filters.dataFim) params.set('dataFim', filters.dataFim);
     if (filters.chaveCte) params.set('chaveCte', filters.chaveCte);
+    if (filters.sistema) params.set('sistema', filters.sistema);
 
     const query = params.toString();
     return request<QivezLancamento[]>(`/qivez/lancamentos${query ? `?${query}` : ''}`);
