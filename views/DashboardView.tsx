@@ -511,24 +511,30 @@ const jsonToXmlNode = (key: string, value: unknown): string => {
   return `<${tagName}>${escapeXml(value)}</${tagName}>`;
 };
 
+const CTe_XMLNS = 'http://www.portalfiscal.inf.br/cte';
+
 const jsonToXmlDocument = (value: unknown) => {
   if (!value || typeof value !== 'object') return String(value ?? '');
 
   const record = value as Record<string, unknown>;
 
   if (record.CTe) {
-    return `<?xml version="1.0" encoding="UTF-8"?>\n${jsonToXmlNode('CTe', record.CTe)}`;
+    const cteRecord = (typeof record.CTe === 'object' && record.CTe !== null)
+      ? (record.CTe as Record<string, unknown>)
+      : {};
+    const cteWithNs = { xmlns: cteRecord.xmlns ?? CTe_XMLNS, ...cteRecord };
+    return jsonToXmlNode('CTe', cteWithNs);
   }
 
   const entries = Object.entries(record);
   if (entries.length === 1) {
     const [key, childValue] = entries[0];
-    return `<?xml version="1.0" encoding="UTF-8"?>\n${jsonToXmlNode(key, childValue)}`;
+    return jsonToXmlNode(key, childValue);
   }
 
   // Multiple root keys — wrap in container to produce valid XML
   const body = entries.map(([key, childValue]) => jsonToXmlNode(key, childValue)).join('');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<lancamento>\n${body}\n</lancamento>`;
+  return `<lancamento>\n${body}\n</lancamento>`;
 };
 
 const getXmlContent = (xmlSource: unknown) => {
