@@ -116,14 +116,19 @@ export const api = {
     return request<QivezLancamento[]>(`/qivez/lancamentos${query ? `?${query}` : ''}`);
   },
 
-  getQivezCanceladas: (filters: { dataInicio?: string; dataFim?: string; chaveCte?: string } = {}) => {
+  getQivezSistemas: () => request<string[]>('/qivez/sistemas'),
+
+  getQivezCanceladas: (filters: { dataInicio?: string; dataFim?: string; chaveCte?: string; sistema?: string } = {}) => {
     const params = new URLSearchParams();
     if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
     if (filters.dataFim) params.set('dataFim', filters.dataFim);
     if (filters.chaveCte) params.set('chaveCte', filters.chaveCte);
+    if (filters.sistema) params.set('sistema', filters.sistema);
     const query = params.toString();
     return request<QivezLancamento[]>(`/qivez/canceladas${query ? `?${query}` : ''}`);
   },
+
+  getQivezSistemasCanceladas: () => request<string[]>('/qivez/sistemas-canceladas'),
 
   getQivezDashboard: () => request<QivezDashboardResponse>('/qivez/dashboard'),
 

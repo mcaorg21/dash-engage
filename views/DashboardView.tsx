@@ -9,7 +9,7 @@ const INTERNAL_LOGO_SRC = '/logo/white-logo.7e189ed.webp';
 
 const qivezTabs = [
   { id: 'conciliacao_qivez_painel', label: 'Painel', icon: LayoutDashboard },
-  { id: 'conciliacao_qivez_listar', label: 'Listar', icon: List },
+  { id: 'conciliacao_qivez_listar', label: 'Não Conciliadas', icon: List },
   { id: 'conciliacao_qivez_canceladas', label: 'Canceladas', icon: XCircle },
   { id: 'conciliacao_qivez_importar', label: 'Importar', icon: Upload },
 ];
@@ -24,7 +24,7 @@ const qivezTitles: Record<string, { title: string; description: string }> = {
     description: 'Resumo operacional da conciliacao CTe.',
   },
   conciliacao_qivez_listar: {
-    title: 'CTe - Listar',
+    title: 'CTe - Não Conciliadas',
     description: 'Listagem de registros da conciliacao CTe.',
   },
   conciliacao_qivez_canceladas: {
@@ -665,7 +665,12 @@ const QivezListarView = () => {
   const [dataFim, setDataFim] = useState('');
   const [chaveCte, setChaveCte] = useState('');
   const [sistema, setSistema] = useState('');
+  const [sistemas, setSistemas] = useState<string[]>([]);
   const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '' });
+
+  useEffect(() => {
+    api.getQivezSistemas().then(setSistemas).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -694,7 +699,7 @@ const QivezListarView = () => {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">CTe - Listar</h1>
+        <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">CTe - Não Conciliadas</h1>
         <p className="mt-1 text-sm text-slate-500">
           Lancamentos financeiros sem CTe Sysemp, ordenados por ID.
         </p>
@@ -704,7 +709,7 @@ const QivezListarView = () => {
         <div className="border-b border-slate-100 px-6 py-4">
           <div className="w-full">
             <form
-              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(160px,1fr)_auto_auto_auto] lg:items-end"
+              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_auto_auto_auto] lg:items-end"
               onSubmit={event => {
                 event.preventDefault();
                 setAppliedFilters({ dataInicio, dataFim, chaveCte: chaveCte.trim(), sistema: sistema.trim() });
@@ -741,17 +746,6 @@ const QivezListarView = () => {
                 />
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Origem</label>
-                <input
-                  type="search"
-                  value={sistema}
-                  onChange={event => setSistema(event.target.value)}
-                  placeholder="Filtrar origem"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
-                />
-              </div>
-
               <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
                 Filtrar
               </button>
@@ -782,6 +776,29 @@ const QivezListarView = () => {
             </form>
           </div>
         </div>
+
+        {sistemas.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-6 py-3">
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Origem:</span>
+            <button
+              type="button"
+              onClick={() => { setSistema(''); setAppliedFilters(f => ({ ...f, sistema: '' })); }}
+              className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${sistema === '' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+            >
+              Todos
+            </button>
+            {sistemas.map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => { setSistema(s); setAppliedFilters(f => ({ ...f, sistema: s })); }}
+                className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${sistema === s ? sistemaBadgeClass(s) + ' ring-2' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
 
         {isLoading && (
           <div className="p-8 text-sm font-medium text-slate-500">Carregando lancamentos...</div>
@@ -851,7 +868,13 @@ const QivezCanceladasView = () => {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [chaveCte, setChaveCte] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveCte: '' });
+  const [sistema, setSistema] = useState('');
+  const [sistemas, setSistemas] = useState<string[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '' });
+
+  useEffect(() => {
+    api.getQivezSistemasCanceladas().then(setSistemas).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -886,7 +909,7 @@ const QivezCanceladasView = () => {
             className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(220px,1.4fr)_auto_auto_auto] lg:items-end"
             onSubmit={event => {
               event.preventDefault();
-              setAppliedFilters({ dataInicio, dataFim, chaveCte: chaveCte.trim() });
+              setAppliedFilters({ dataInicio, dataFim, chaveCte: chaveCte.trim(), sistema: sistema.trim() });
             }}
           >
             <div>
@@ -909,7 +932,7 @@ const QivezCanceladasView = () => {
               Filtrar
             </button>
             <button type="button" className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100"
-              onClick={() => { setDataInicio(''); setDataFim(''); setChaveCte(''); setAppliedFilters({ dataInicio: '', dataFim: '', chaveCte: '' }); }}>
+              onClick={() => { setDataInicio(''); setDataFim(''); setChaveCte(''); setSistema(''); setAppliedFilters({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '' }); }}>
               Limpar
             </button>
             <button type="button" disabled={rows.length === 0}
@@ -919,6 +942,24 @@ const QivezCanceladasView = () => {
             </button>
           </form>
         </div>
+
+        {sistemas.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-6 py-3">
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Origem:</span>
+            <button type="button"
+              onClick={() => { setSistema(''); setAppliedFilters(f => ({ ...f, sistema: '' })); }}
+              className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${sistema === '' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+              Todos
+            </button>
+            {sistemas.map(s => (
+              <button key={s} type="button"
+                onClick={() => { setSistema(s); setAppliedFilters(f => ({ ...f, sistema: s })); }}
+                className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${sistema === s ? sistemaBadgeClass(s) + ' ring-2' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
 
         {isLoading && <div className="p-8 text-sm font-medium text-slate-500">Carregando canceladas...</div>}
         {error && <div className="p-8 text-sm font-medium text-red-600">{error}</div>}
@@ -932,6 +973,7 @@ const QivezCanceladasView = () => {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data de lancamento</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Origem</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Chave CTE</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tipo</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor</th>
@@ -942,6 +984,7 @@ const QivezCanceladasView = () => {
                 {rows.map((row, rowIndex) => (
                   <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
                     <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_lancamento)}</td>
+                    <td className="whitespace-nowrap px-4 py-3"><SistemaBadge value={row.sistema} /></td>
                     <td className="max-w-[360px] truncate whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={formatCellValue(row.chave_cte)}>
                       {formatCellValue(row.chave_cte)}
                     </td>

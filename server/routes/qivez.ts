@@ -59,6 +59,25 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
   }
 });
 
+router.get('/sistemas', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_qivez_listar');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const result = await pool.query(`
+      SELECT DISTINCT sistema::text AS sistema
+      FROM public.lancamentos_financeiros
+      WHERE sistema IS NOT NULL AND sistema <> ''
+        AND existe_qives_sysemp = false AND cancelada = false
+      ORDER BY sistema
+    `);
+    res.json(result.rows.map((r: { sistema: string }) => r.sistema));
+  } catch (err) {
+    console.error('Qivez sistemas error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 router.get('/lancamentos', async (req: AuthRequest, res) => {
   try {
     const allowed = await hasPermission(req, 'conciliacao_qivez_listar');
@@ -112,6 +131,24 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
   }
 });
 
+router.get('/sistemas-canceladas', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_qivez_canceladas');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const result = await pool.query(`
+      SELECT DISTINCT sistema::text AS sistema
+      FROM public.lancamentos_financeiros
+      WHERE sistema IS NOT NULL AND sistema <> '' AND cancelada = true
+      ORDER BY sistema
+    `);
+    res.json(result.rows.map((r: { sistema: string }) => r.sistema));
+  } catch (err) {
+    console.error('Qivez sistemas-canceladas error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 router.get('/canceladas', async (req: AuthRequest, res) => {
   try {
     const allowed = await hasPermission(req, 'conciliacao_qivez_canceladas');
@@ -120,7 +157,7 @@ router.get('/canceladas', async (req: AuthRequest, res) => {
       return;
     }
 
-    const { dataInicio, dataFim, chaveCte } = req.query;
+    const { dataInicio, dataFim, chaveCte, sistema } = req.query;
     const filters = ['cancelada = true'];
     const values: string[] = [];
 
@@ -139,12 +176,18 @@ router.get('/canceladas', async (req: AuthRequest, res) => {
       filters.push(`chave_cte ILIKE $${values.length}`);
     }
 
+    if (typeof sistema === 'string' && sistema.trim()) {
+      values.push(`%${sistema.trim()}%`);
+      filters.push(`sistema ILIKE $${values.length}`);
+    }
+
     const result = await pool.query(`
       SELECT
         id,
         data_lancamento,
         chave_cte,
         tipo,
+        sistema::text AS sistema,
         diferenca_valor AS valor,
         json_xml
       FROM public.lancamentos_financeiros
