@@ -92,7 +92,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
         data_lancamento,
         chave_cte,
         tipo,
-        sistema,
+        sistema::text AS sistema,
         diferenca_valor AS valor,
         json_xml
       FROM public.lancamentos_financeiros
