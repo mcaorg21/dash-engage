@@ -513,36 +513,64 @@ const jsonToXmlNode = (key: string, value: unknown): string => {
 
 const CTe_XMLNS = 'http://www.portalfiscal.inf.br/cte';
 
-const jsonToXmlDocument = (value: unknown) => {
+// Some importers store XML attributes as { "attributes": { key: val } }.
+// Flatten those into direct properties so they render as child elements,
+// matching the format of records that store properties directly.
+function flattenAttributes(obj: unknown): unknown {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  const record = obj as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(record)) {
+    if (key === 'attributes' && val && typeof val === 'object' && !Array.isArray(val)) {
+      Object.assign(result, val);
+    } else {
+      result[key] = flattenAttributes(val);
+    }
+  }
+  return result;
+}
+
+// Recursively finds the node that IS a CTe (identified by having infCte as child)
+function findCTeNode(obj: unknown): Record<string, unknown> | null {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  const record = obj as Record<string, unknown>;
+  if ('infCte' in record) return record;
+  for (const val of Object.values(record)) {
+    const found = findCTeNode(val);
+    if (found) return found;
+  }
+  return null;
+}
+
+const jsonToXmlDocument = (value: unknown, chaveCteFallback?: string) => {
   if (!value || typeof value !== 'object') return String(value ?? '');
 
-  const record = value as Record<string, unknown>;
+  // Normalize { attributes: {...} } sub-objects into flat properties first
+  const record = flattenAttributes(value) as Record<string, unknown>;
 
-  if (record.CTe) {
-    const cteRecord = (typeof record.CTe === 'object' && record.CTe !== null)
-      ? (record.CTe as Record<string, unknown>)
-      : {};
-    const cteWithNs = { xmlns: cteRecord.xmlns ?? CTe_XMLNS, ...cteRecord };
+  // Find CTe node: either at root or nested inside any wrapper (data>xml>CTe etc.)
+  const cteNode = record.CTe
+    ? (record.CTe as Record<string, unknown>)
+    : findCTeNode(record);
+
+  if (cteNode) {
+    const cteWithNs = { xmlns: (cteNode.xmlns as string) ?? CTe_XMLNS, ...cteNode };
     return jsonToXmlNode('CTe', cteWithNs);
   }
 
+  // No CTe structure found — wrap raw content in <CTe> with Id from chave_cte
+  const id = chaveCteFallback ? `CTe${chaveCteFallback}` : '';
   const entries = Object.entries(record);
-  if (entries.length === 1) {
-    const [key, childValue] = entries[0];
-    return jsonToXmlNode(key, childValue);
-  }
-
-  // Multiple root keys — wrap in container to produce valid XML
   const body = entries.map(([key, childValue]) => jsonToXmlNode(key, childValue)).join('');
-  return `<lancamento>\n${body}\n</lancamento>`;
+  return `<CTe xmlns="${CTe_XMLNS}">${id ? `<Id>${id}</Id>` : ''}${body}</CTe>`;
 };
 
-const getXmlContent = (xmlSource: unknown) => {
+const getXmlContent = (xmlSource: unknown, chaveCte?: string) => {
   if (!xmlSource) return '';
 
   return typeof xmlSource === 'string' && xmlSource.trim().startsWith('<')
     ? xmlSource
-    : jsonToXmlDocument(xmlSource);
+    : jsonToXmlDocument(xmlSource, chaveCte);
 };
 
 const downloadTextFile = (content: string, filename: string) => {
@@ -558,14 +586,14 @@ const downloadTextFile = (content: string, filename: string) => {
 };
 
 const downloadXml = (row: Record<string, unknown>) => {
-  const xmlContent = getXmlContent(row.json_xml);
+  const chave = formatCellValue(row.chave_cte);
+  const xmlContent = getXmlContent(row.json_xml, chave !== '-' ? chave : undefined);
   if (!xmlContent) return;
 
+  const chaveCte = chave.replace(/[^a-zA-Z0-9_-]/g, '_');
   const id = formatCellValue(row.id);
-  const chaveCte = formatCellValue(row.chave_cte).replace(/[^a-zA-Z0-9_-]/g, '_');
   const basename = chaveCte && chaveCte !== '-' ? chaveCte : `lancamento-${id}`;
-  const isXml = xmlContent.trimStart().startsWith('<');
-  downloadTextFile(xmlContent, `${basename}.${isXml ? 'xml' : 'txt'}`);
+  downloadTextFile(xmlContent, `${basename}.xml`);
 };
 
 const downloadBlobFile = (blob: Blob, filename: string) => {
@@ -584,11 +612,12 @@ const downloadFilteredXmlZip = async (rows: Record<string, unknown>[]) => {
   let total = 0;
 
   rows.forEach(row => {
-    const xmlContent = getXmlContent(row.json_xml);
+    const chave = formatCellValue(row.chave_cte);
+    const xmlContent = getXmlContent(row.json_xml, chave !== '-' ? chave : undefined);
     if (!xmlContent) return;
 
     const id = formatCellValue(row.id).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const chaveCte = formatCellValue(row.chave_cte).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const chaveCte = chave.replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = chaveCte && chaveCte !== '-' ? `${chaveCte}.xml` : `lancamento-${id}.xml`;
 
     zip.file(filename, xmlContent);
