@@ -97,7 +97,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
         json_xml
       FROM public.lancamentos_financeiros
       WHERE ${filters.join(' AND ')}
-      ORDER BY id ASC
+      ORDER BY data_lancamento DESC, id DESC
     `, values);
 
     res.json(result.rows);
@@ -144,7 +144,7 @@ router.get('/canceladas', async (req: AuthRequest, res) => {
         json_xml
       FROM public.lancamentos_financeiros
       WHERE ${filters.join(' AND ')}
-      ORDER BY id ASC
+      ORDER BY data_lancamento DESC, id DESC
     `, values);
 
     res.json(result.rows);
