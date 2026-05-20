@@ -581,6 +581,24 @@ const downloadFilteredXmlZip = async (rows: Record<string, unknown>[]) => {
   downloadBlobFile(blob, 'lancamentos-cte-filtrados.zip');
 };
 
+const SISTEMA_STYLES: Record<string, string> = {
+  qivez:   'bg-[var(--engage-blue-400)]/10 text-[var(--engage-blue-800)]',
+  sysemp:  'bg-emerald-50 text-emerald-700',
+  sap:     'bg-violet-50 text-violet-700',
+  totvs:   'bg-amber-50 text-amber-700',
+};
+
+const SistemaBadge = ({ value }: { value: unknown }) => {
+  const label = value ? String(value) : '—';
+  const key = label.toLowerCase();
+  const cls = SISTEMA_STYLES[key] ?? 'bg-slate-100 text-slate-600';
+  return (
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold ${cls}`}>
+      {label}
+    </span>
+  );
+};
+
 const QivezListarView = () => {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -712,6 +730,7 @@ const QivezListarView = () => {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data de lancamento</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Origem</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Chave CTE</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tipo</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor</th>
@@ -724,6 +743,9 @@ const QivezListarView = () => {
                 {rows.map((row, rowIndex) => (
                   <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
                     <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_lancamento)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <SistemaBadge value={row.sistema} />
+                    </td>
                     <td className="max-w-[360px] truncate whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={formatCellValue(row.chave_cte)}>
                       {formatCellValue(row.chave_cte)}
                     </td>
