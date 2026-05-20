@@ -515,10 +515,20 @@ const jsonToXmlDocument = (value: unknown) => {
   if (!value || typeof value !== 'object') return String(value ?? '');
 
   const record = value as Record<string, unknown>;
-  const entries = record.CTe ? [['CTe', record.CTe] as [string, unknown]] : Object.entries(record);
-  const body = entries.map(([key, childValue]) => jsonToXmlNode(key, childValue)).join('');
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n${body}`;
+  if (record.CTe) {
+    return `<?xml version="1.0" encoding="UTF-8"?>\n${jsonToXmlNode('CTe', record.CTe)}`;
+  }
+
+  const entries = Object.entries(record);
+  if (entries.length === 1) {
+    const [key, childValue] = entries[0];
+    return `<?xml version="1.0" encoding="UTF-8"?>\n${jsonToXmlNode(key, childValue)}`;
+  }
+
+  // Multiple root keys — wrap in container to produce valid XML
+  const body = entries.map(([key, childValue]) => jsonToXmlNode(key, childValue)).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<lancamento>\n${body}\n</lancamento>`;
 };
 
 const getXmlContent = (xmlSource: unknown) => {
@@ -545,7 +555,11 @@ const downloadXml = (row: Record<string, unknown>) => {
   const xmlContent = getXmlContent(row.json_xml);
   if (!xmlContent) return;
 
-  downloadTextFile(xmlContent, `lancamento-${formatCellValue(row.id)}.xml`);
+  const id = formatCellValue(row.id);
+  const chaveCte = formatCellValue(row.chave_cte).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const basename = chaveCte && chaveCte !== '-' ? chaveCte : `lancamento-${id}`;
+  const isXml = xmlContent.trimStart().startsWith('<');
+  downloadTextFile(xmlContent, `${basename}.${isXml ? 'xml' : 'txt'}`);
 };
 
 const downloadBlobFile = (blob: Blob, filename: string) => {
