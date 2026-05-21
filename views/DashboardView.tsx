@@ -699,7 +699,14 @@ const QivezListarView = () => {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">CTe - Não Conciliadas</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">CTe - Não Conciliadas</h1>
+          {!isLoading && !error && (
+            <span className="rounded-full bg-[var(--engage-blue-400)]/15 px-3 py-0.5 text-sm font-bold text-[var(--engage-blue-800)]">
+              {rows.length} {rows.length === 1 ? 'registro' : 'registros'}
+            </span>
+          )}
+        </div>
         <p className="mt-1 text-sm text-slate-500">
           Lancamentos financeiros sem CTe Sysemp, ordenados por ID.
         </p>
@@ -899,7 +906,14 @@ const QivezCanceladasView = () => {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">CTe - Canceladas</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">CTe - Canceladas</h1>
+          {!isLoading && !error && (
+            <span className="rounded-full bg-[var(--engage-blue-400)]/15 px-3 py-0.5 text-sm font-bold text-[var(--engage-blue-800)]">
+              {rows.length} {rows.length === 1 ? 'registro' : 'registros'}
+            </span>
+          )}
+        </div>
         <p className="mt-1 text-sm text-slate-500">Lancamentos marcados como cancelados.</p>
       </div>
 
