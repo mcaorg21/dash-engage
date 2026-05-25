@@ -68,7 +68,7 @@ router.get('/sistemas', async (req: AuthRequest, res) => {
       SELECT DISTINCT sistema::text AS sistema
       FROM public.lancamentos_financeiros
       WHERE sistema IS NOT NULL AND sistema <> ''
-        AND (existe_qives_sysemp = false OR existe_planilha_sysemp = false) AND cancelada = false
+        AND existe_qives_sysemp = false AND cancelada = false
       ORDER BY sistema
     `);
     res.json(result.rows.map((r: { sistema: string }) => r.sistema));
@@ -87,7 +87,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
     }
 
     const { dataInicio, dataFim, chaveCte, sistema } = req.query;
-    const filters = ['(existe_qives_sysemp = false OR existe_planilha_sysemp = false)', 'cancelada = false'];
+    const filters = ['existe_qives_sysemp = false', 'cancelada = false'];
     const values: string[] = [];
 
     if (typeof dataInicio === 'string' && dataInicio) {
