@@ -542,6 +542,35 @@ function findCTeNode(obj: unknown): Record<string, unknown> | null {
   return null;
 }
 
+// Which child keys of each element should be rendered as XML attributes (not child elements).
+// This reconstructs the original XML attribute structure that JSON importers flatten.
+const CTE_ATTR_MAP: Record<string, string[]> = {
+  infCte: ['Id', 'versao'],
+  infModal: ['versaoModal'],
+  ObsCont: ['xCampo'],
+  Reference: ['URI'],
+  CanonicalizationMethod: ['Algorithm'],
+  SignatureMethod: ['Algorithm'],
+  DigestMethod: ['Algorithm'],
+  Transform: ['Algorithm'],
+};
+
+function normalizeCteJson(obj: unknown, parentKey?: string): unknown {
+  if (Array.isArray(obj)) return obj.map(item => normalizeCteJson(item, parentKey));
+  if (!obj || typeof obj !== 'object') return obj;
+  const record = obj as Record<string, unknown>;
+  const attrKeys = parentKey ? (CTE_ATTR_MAP[parentKey] ?? []) : [];
+  const result: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(record)) {
+    if (attrKeys.includes(key)) {
+      result[`@${key}`] = val;
+    } else {
+      result[key] = normalizeCteJson(val, key);
+    }
+  }
+  return result;
+}
+
 const jsonToXmlDocument = (value: unknown, chaveCteFallback?: string) => {
   if (!value || typeof value !== 'object') return String(value ?? '');
 
@@ -554,15 +583,18 @@ const jsonToXmlDocument = (value: unknown, chaveCteFallback?: string) => {
     : findCTeNode(record);
 
   if (cteNode) {
-    const cteWithNs = { xmlns: (cteNode.xmlns as string) ?? CTe_XMLNS, ...cteNode };
-    return jsonToXmlNode('CTe', cteWithNs);
+    // Promote specific child elements to XML attributes to match cteProc standard format
+    const normalized = normalizeCteJson(cteNode) as Record<string, unknown>;
+    const cteWithNs = { xmlns: (cteNode.xmlns as string) ?? CTe_XMLNS, ...normalized };
+    const cteXml = jsonToXmlNode('CTe', cteWithNs);
+    return `<cteProc versao="4.00" xmlns="${CTe_XMLNS}">${cteXml}</cteProc>`;
   }
 
   // No CTe structure found — wrap raw content in <CTe> with Id from chave_cte
   const id = chaveCteFallback ? `CTe${chaveCteFallback}` : '';
   const entries = Object.entries(record);
   const body = entries.map(([key, childValue]) => jsonToXmlNode(key, childValue)).join('');
-  return `<CTe xmlns="${CTe_XMLNS}">${id ? `<Id>${id}</Id>` : ''}${body}</CTe>`;
+  return `<cteProc versao="4.00" xmlns="${CTe_XMLNS}"><CTe xmlns="${CTe_XMLNS}">${id ? `<Id>${id}</Id>` : ''}${body}</CTe></cteProc>`;
 };
 
 const getXmlContent = (xmlSource: unknown, chaveCte?: string) => {
