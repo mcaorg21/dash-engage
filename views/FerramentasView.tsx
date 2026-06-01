@@ -147,7 +147,12 @@ const PlanilhasView = () => {
 
   // Transportadora (per file, GCS metadata)
   const [editTransportadoras, setEditTransportadoras] = useState<Record<string, string>>({});
+  const [editTransportadoraTextos, setEditTransportadoraTextos] = useState<Record<string, string>>({});
   const [savingTransportadora, setSavingTransportadora] = useState<string | null>(null);
+  const [detectedCpSums, setDetectedCpSums] = useState<Record<string, number | null>>({});
+  const [classifyingCp, setClassifyingCp] = useState<Record<string, string>>({});
+  const [loadingCpSum, setLoadingCpSum] = useState<Record<string, boolean>>({});
+  const [savedValueColumns, setSavedValueColumns] = useState<string[]>([]);
 
   // Global saved column names (DB)
   const [savedColumnNames, setSavedColumnNames] = useState<string[]>([]);
@@ -178,6 +183,15 @@ const PlanilhasView = () => {
     }
   }, []);
 
+  const loadSavedValueColumns = useCallback(async () => {
+    try {
+      const names = await api.getValorMapeamentos();
+      setSavedValueColumns(names);
+    } catch {
+      // non-critical, silently fail
+    }
+  }, []);
+
   const loadFiles = useCallback(async () => {
     setIsLoadingFiles(true);
     setListError(null);
@@ -185,7 +199,14 @@ const PlanilhasView = () => {
       const data = await api.getPlanilhas();
       const sorted = data.sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''));
       setBucketFiles(sorted);
-      setEditTransportadoras(Object.fromEntries(sorted.map(f => [f.name, f.transportadora ?? ''])));
+      setEditTransportadoras(Object.fromEntries(sorted.map(f => {
+        const parts = (f.transportadora ?? '').split(' ');
+        return [f.name, parts[0] ?? ''];
+      })));
+      setEditTransportadoraTextos(Object.fromEntries(sorted.map(f => {
+        const parts = (f.transportadora ?? '').split(' ');
+        return [f.name, parts.slice(1).join(' ')];
+      })));
     } catch (err: any) {
       setListError(err.message || 'Erro ao listar arquivos.');
     } finally {
@@ -196,7 +217,16 @@ const PlanilhasView = () => {
   useEffect(() => {
     loadFiles();
     loadSavedNames();
-  }, [loadFiles, loadSavedNames]);
+    loadSavedValueColumns();
+  }, [loadFiles, loadSavedNames, loadSavedValueColumns]);
+
+  // Auto-detecta colunas assim que os arquivos são carregados
+  useEffect(() => {
+    if (bucketFiles.length > 0) {
+      bucketFiles.forEach(f => fetchColumns(f.name));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bucketFiles.length]);
 
   const addFiles = (incoming: FileList | File[]) => {
     const arr = Array.from(incoming).filter(f =>
@@ -262,7 +292,9 @@ const PlanilhasView = () => {
   };
 
   const handleSaveTransportadora = async (file: BucketFile) => {
-    const transportadora = editTransportadoras[file.name] ?? '';
+    const sigla = editTransportadoras[file.name] ?? '';
+    const titulo = (editTransportadoraTextos[file.name] ?? '').trim();
+    const transportadora = titulo ? `${sigla} ${titulo}` : sigla;
     setSavingTransportadora(file.name);
     try {
       await api.updatePlanilhaMetadata(file.name, { transportadora });
@@ -277,19 +309,65 @@ const PlanilhasView = () => {
   const fetchColumns = async (filename: string) => {
     setLoadingColumns(prev => ({ ...prev, [filename]: true }));
     try {
-      const cols = await api.getPlanilhaColumns(filename);
-      setFileColumns(prev => ({ ...prev, [filename]: cols }));
+      const raw = await api.getPlanilhaColumns(filename);
+      const headers = Array.isArray(raw) ? raw : raw.headers;
+      const cvValue = Array.isArray(raw) ? null : raw.cvValue;
+      const cpSum = Array.isArray(raw) ? null : raw.cpSum;
+      setFileColumns(prev => ({ ...prev, [filename]: headers }));
       // Auto-select the first column that matches a saved name
       const savedSet = new Set(savedColumnNames);
-      const autoMatch = cols.find(c => savedSet.has(c));
+      const autoMatch = headers.find(c => savedSet.has(c));
       if (autoMatch) {
         setSelectedColumn(prev => ({ ...prev, [filename]: autoMatch }));
+      }
+      // Preenche Título com o primeiro valor da coluna NUMERO DA FATURA
+      // Se NAO_ENCONTRADO, preserva o que já estava preenchido
+      let resolvedTitulo = editTransportadoraTextos[filename] ?? '';
+      if (cvValue != null) {
+        if (cvValue !== 'NAO_ENCONTRADO' || !resolvedTitulo.trim()) {
+          resolvedTitulo = cvValue;
+        }
+        setEditTransportadoraTextos(prev => ({ ...prev, [filename]: resolvedTitulo }));
+      }
+      // Armazena soma da coluna CP
+      setDetectedCpSums(prev => ({ ...prev, [filename]: cpSum ?? null }));
+
+      // Auto-save na metadata somente se sigla já estiver preenchida manualmente
+      const sigla = editTransportadoras[filename] ?? '';
+      if (sigla.trim()) {
+        const merged = resolvedTitulo.trim() ? `${sigla} ${resolvedTitulo.trim()}`.trim() : sigla;
+        const file = bucketFiles.find(f => f.name === filename);
+        if (file && merged !== (file.transportadora ?? '')) {
+          try {
+            await api.updatePlanilhaMetadata(filename, { transportadora: merged });
+            setBucketFiles(prev => prev.map(f => f.name === filename ? { ...f, transportadora: merged } : f));
+          } catch { /* silently ignore */ }
+        }
       }
     } catch (err: any) {
       await alert(err.message || 'Erro ao ler colunas do arquivo.', 'Erro');
       setFileColumns(prev => ({ ...prev, [filename]: [] }));
     } finally {
       setLoadingColumns(prev => ({ ...prev, [filename]: false }));
+    }
+  };
+
+  const handleClassifyCp = async (filename: string) => {
+    const column = classifyingCp[filename];
+    if (!column) return;
+    setLoadingCpSum(prev => ({ ...prev, [filename]: true }));
+    try {
+      const { sum } = await api.getPlanilhaColumnSum(filename, column);
+      setDetectedCpSums(prev => ({ ...prev, [filename]: sum }));
+      // Salva no dicionário se ainda não estiver
+      if (!savedValueColumns.includes(column)) {
+        await api.saveValorColumnName(column);
+        setSavedValueColumns(prev => [...prev, column].sort());
+      }
+    } catch {
+      // mantém null
+    } finally {
+      setLoadingCpSum(prev => ({ ...prev, [filename]: false }));
     }
   };
 
@@ -405,10 +483,18 @@ const PlanilhasView = () => {
       <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <h2 className="text-base font-bold text-slate-800">Repositorio</h2>
-          <button type="button" onClick={loadFiles} disabled={isLoadingFiles}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40">
-            <Loader2 size={16} className={isLoadingFiles ? 'animate-spin' : ''} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button"
+              onClick={() => bucketFiles.forEach(f => fetchColumns(f.name))}
+              disabled={isLoadingFiles || bucketFiles.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40">
+              <Search size={13} /> Detectar todos
+            </button>
+            <button type="button" onClick={loadFiles} disabled={isLoadingFiles}
+              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40">
+              <Loader2 size={16} className={isLoadingFiles ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
         {isLoadingFiles && <div className="p-8 text-sm font-medium text-slate-500">Carregando arquivos...</div>}
@@ -418,22 +504,12 @@ const PlanilhasView = () => {
         )}
 
         {!isLoadingFiles && !listError && bucketFiles.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-max border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nome</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tamanho</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Atualizado em</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Transportadora</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Coluna para extrair</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Acoes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {bucketFiles.map(file => {
+          <div className="divide-y divide-slate-100">
+            {bucketFiles.map(file => {
                   const transpEdit = editTransportadoras[file.name] ?? '';
-                  const isTranspDirty = transpEdit !== (file.transportadora ?? '');
+                  const transpTitulo = editTransportadoraTextos[file.name] ?? '';
+                  const transpMerged = transpTitulo.trim() ? `${transpEdit} ${transpTitulo.trim()}` : transpEdit;
+                  const isTranspDirty = transpMerged !== (file.transportadora ?? '');
                   const isTranspSaving = savingTransportadora === file.name;
 
                   const cols = fileColumns[file.name];
@@ -441,19 +517,39 @@ const PlanilhasView = () => {
                   const colSelected = selectedColumn[file.name] ?? '';
                   const isAlreadySaved = savedColumnNames.includes(colSelected);
                   const isColSaving = savingColumn === file.name;
+                  const cpSum = detectedCpSums[file.name];
+                  const cpSumFmt = cpSum != null
+                    ? cpSum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                    : null;
 
                   return (
-                    <tr key={file.name} className="hover:bg-slate-50/70">
-                      <td className="flex items-center gap-2 whitespace-nowrap px-4 py-3">
-                        <FileSpreadsheet size={15} className="shrink-0 text-emerald-500" />
-                        <span className="max-w-[240px] truncate font-medium text-slate-700" title={file.name}>{file.name}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatBytes(file.size)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatDate(file.updated)}</td>
+                    <div key={file.name} className="px-4 py-3 transition-colors hover:bg-slate-50/60">
+                      {/* Linha 1: nome + ações + meta */}
+                      <div className="mb-2.5 flex items-center justify-between gap-4">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <FileSpreadsheet size={15} className="shrink-0 text-emerald-500" />
+                          <span className="truncate text-sm font-medium text-slate-700" title={file.name}>{file.name}</span>
+                          <button type="button" onClick={() => handleDownload(file)} title="Baixar"
+                            className="shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-[var(--engage-blue-400)]/10 hover:text-[var(--engage-blue-800)]">
+                            <Download size={14} />
+                          </button>
+                          <button type="button" onClick={() => handleDelete(file)} disabled={deletingFile === file.name} title="Deletar"
+                            className="shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50">
+                            {deletingFile === file.name ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          </button>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3 text-xs text-slate-400">
+                          <span>{formatBytes(file.size)}</span>
+                          <span>{formatDate(file.updated)}</span>
+                        </div>
+                      </div>
 
-                      {/* Transportadora */}
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex items-center gap-2">
+                      {/* Linha 2: controles com labels em cima */}
+                      <div className="flex flex-wrap items-end justify-end gap-x-3 gap-y-2">
+
+                        {/* Sigla */}
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-semibold text-slate-400">Sigla</span>
                           <SearchableSelect
                             value={transpEdit}
                             onChange={v => setEditTransportadoras(prev => ({ ...prev, [file.name]: v }))}
@@ -461,76 +557,107 @@ const PlanilhasView = () => {
                             disabled={isTranspSaving}
                             placeholder="Selecionar..."
                           />
-                          <button type="button" onClick={() => handleSaveTransportadora(file)}
-                            disabled={isTranspSaving || !isTranspDirty} title="Salvar transportadora"
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40">
-                            {isTranspSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                          </button>
                         </div>
-                      </td>
 
-                      {/* Coluna para extrair */}
-                      <td className="whitespace-nowrap px-4 py-3">
-                        {cols === undefined ? (
-                          <button type="button" onClick={() => fetchColumns(file.name)} disabled={isLoadingCols}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50">
-                            {isLoadingCols ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
-                            Detectar colunas
-                          </button>
-                        ) : cols.length === 0 ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-red-500">Sem colunas detectadas</span>
-                            <button type="button"
-                              onClick={() => setFileColumns(prev => { const n = { ...prev }; delete n[file.name]; return n; })}
-                              className="text-xs text-slate-400 underline hover:text-slate-600">
-                              Tentar novamente
+                        {/* Título */}
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-semibold text-slate-400">Título</span>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={transpTitulo}
+                              onChange={e => setEditTransportadoraTextos(prev => ({ ...prev, [file.name]: e.target.value }))}
+                              disabled={isTranspSaving}
+                              placeholder="Título"
+                              className="w-36 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none disabled:opacity-50"
+                            />
+                            <button type="button" onClick={() => handleSaveTransportadora(file)}
+                              disabled={isTranspSaving || !isTranspDirty} title="Salvar"
+                              className="inline-flex shrink-0 items-center rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40">
+                              {isTranspSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                             </button>
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <SearchableSelect
-                              value={colSelected}
-                              onChange={v => setSelectedColumn(prev => ({ ...prev, [file.name]: v }))}
-                              options={cols}
-                              disabled={isColSaving}
-                              placeholder="Selecionar coluna..."
-                              width="w-44"
-                            />
-                            {isAlreadySaved && colSelected ? (
-                              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700">
-                                <CheckCircle2 size={13} /> Salva
-                              </span>
-                            ) : (
-                              <button type="button" onClick={() => handleSaveColumnName(file.name)}
-                                disabled={isColSaving || !colSelected} title="Salvar nome da coluna"
-                                className="inline-flex items-center gap-1 rounded-lg bg-[var(--engage-blue-400)]/10 px-2.5 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:opacity-40">
-                                {isColSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                                Salvar
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Acoes */}
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          <button type="button" onClick={() => handleDownload(file)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20">
-                            <Download size={13} /> Baixar
-                          </button>
-                          <button type="button" onClick={() => handleDelete(file)} disabled={deletingFile === file.name}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50">
-                            {deletingFile === file.name ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                            Deletar
-                          </button>
                         </div>
-                      </td>
-                    </tr>
+
+                        <div className="mb-0.5 h-8 w-px shrink-0 self-end bg-slate-200" />
+
+                        {/* Coluna chave CTE */}
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-semibold text-slate-400">Coluna chave CTe</span>
+                          {cols === undefined ? (
+                            <button type="button" onClick={() => fetchColumns(file.name)} disabled={isLoadingCols}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50">
+                              {isLoadingCols ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
+                              Detectar
+                            </button>
+                          ) : cols.length === 0 ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-red-500">Sem colunas</span>
+                              <button type="button"
+                                onClick={() => setFileColumns(prev => { const n = { ...prev }; delete n[file.name]; return n; })}
+                                className="text-xs text-slate-400 underline hover:text-slate-600">
+                                Tentar novamente
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <SearchableSelect
+                                value={colSelected}
+                                onChange={v => setSelectedColumn(prev => ({ ...prev, [file.name]: v }))}
+                                options={cols}
+                                disabled={isColSaving}
+                                placeholder="Selecionar coluna..."
+                                width="w-44"
+                              />
+                              {isAlreadySaved && colSelected ? (
+                                <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700">
+                                  <CheckCircle2 size={13} /> Salva
+                                </span>
+                              ) : (
+                                <button type="button" onClick={() => handleSaveColumnName(file.name)}
+                                  disabled={isColSaving || !colSelected} title="Salvar nome da coluna"
+                                  className="inline-flex items-center gap-1 rounded-lg bg-[var(--engage-blue-400)]/10 px-2.5 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:opacity-40">
+                                  {isColSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                                  Salvar
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {cols !== undefined && (
+                          <>
+                            <div className="mb-0.5 h-8 w-px shrink-0 self-end bg-slate-200" />
+                            {/* Valor Total CTe's */}
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs font-semibold text-slate-400">Valor Total CTe's</span>
+                              {cpSumFmt ? (
+                                <span className="inline-flex items-center rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700">{cpSumFmt}</span>
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  <SearchableSelect
+                                    value={classifyingCp[file.name] ?? ''}
+                                    onChange={v => setClassifyingCp(prev => ({ ...prev, [file.name]: v }))}
+                                    options={cols ?? []}
+                                    placeholder="Classificar coluna..."
+                                    width="w-44"
+                                  />
+                                  <button type="button"
+                                    onClick={() => handleClassifyCp(file.name)}
+                                    disabled={!classifyingCp[file.name] || loadingCpSum[file.name]}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-40">
+                                    {loadingCpSum[file.name] ? <Loader2 size={12} className="animate-spin" /> : 'Calcular'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
           </div>
         )}
       </div>
@@ -568,56 +695,11 @@ const PlanilhasView = () => {
         )}
       </div>
 
-      {/* n8n endpoint */}
+      {/* n8n endpoint — oculto
       <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm space-y-4">
-        <div>
-          <h2 className="text-base font-bold text-slate-800">Endpoint para n8n</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Le todas as planilhas do bucket, cruza os cabecalhos com as colunas salvas e retorna os valores encontrados.
-            Qualquer planilha nova com uma coluna de nome igual ja e incluida automaticamente — sem precisar reconfigurar.
-          </p>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">URL</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-mono text-slate-700 select-all">
-                GET {extractUrl}
-              </code>
-              <button type="button" onClick={handleCopyUrl}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50">
-                <Copy size={13} />
-                {copiedUrl ? 'Copiado!' : 'Copiar'}
-              </button>
-            </div>
-          </div>
-          <div>
-            <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Header obrigatorio</p>
-            <code className="block rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-mono text-slate-700">
-              X-API-Key: {'<EXTRACT_API_KEY>'}
-            </code>
-            <p className="mt-1 text-xs text-slate-400">Defina a variavel de ambiente <span className="font-mono">EXTRACT_API_KEY</span> no servidor com o valor que desejar.</p>
-          </div>
-          <div>
-            <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Exemplo de resposta</p>
-            <pre className="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-mono text-slate-700">{`[
-  { "transportadora": "BRASPRESS", "arquivo": "braspress_maio.xlsx",  "coluna": "Chave CTE", "valor": "35123456789..." },
-  { "transportadora": "BRASPRESS", "arquivo": "braspress_maio.xlsx",  "coluna": "Chave CTE", "valor": "35987654321..." },
-  { "transportadora": "JADLOG",    "arquivo": "jadlog_abril.xlsx",    "coluna": "CHAVE",     "valor": "35111111111..." }
-]`}</pre>
-          </div>
-          {savedColumnNames.length === 0 && !loadingSavedNames && (
-            <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-700">
-              Nenhuma coluna salva. O endpoint retornara um array vazio ate voce salvar pelo menos um nome de coluna.
-            </div>
-          )}
-          {savedColumnNames.length > 0 && (
-            <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-medium text-emerald-700">
-              Extraindo de colunas: {savedColumnNames.map(n => `"${n}"`).join(', ')}
-            </div>
-          )}
-        </div>
+        ...
       </div>
+      */}
     </div>
   );
 };

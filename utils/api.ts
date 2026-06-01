@@ -166,13 +166,30 @@ export const api = {
     }),
 
   getPlanilhaColumns: (filename: string) =>
-    request<string[]>(`/ferramentas/planilhas/columns?file=${encodeURIComponent(filename)}`),
+    request<{ headers: string[]; cvValue: string | null; cpSum: number | null } | string[]>(`/ferramentas/planilhas/columns?file=${encodeURIComponent(filename)}`),
+
+  getPlanilhaColumnSum: (filename: string, column: string) =>
+    request<{ sum: number | null }>(`/ferramentas/planilhas/column-sum?file=${encodeURIComponent(filename)}&column=${encodeURIComponent(column)}`),
 
   extractPlanilhas: () =>
     request<ExtractRow[]>('/ferramentas/planilhas/extract'),
 
   getMapeamentos: () =>
     request<string[]>('/ferramentas/mapeamentos'),
+
+  getValorMapeamentos: () =>
+    request<string[]>('/ferramentas/mapeamentos/valores'),
+
+  saveValorColumnName: (columnName: string) =>
+    request<{ saved: string }>('/ferramentas/mapeamentos/valores', {
+      method: 'POST',
+      body: JSON.stringify({ columnName }),
+    }),
+
+  deleteValorColumnName: (columnName: string) =>
+    request<{ deleted: string }>(`/ferramentas/mapeamentos/valores/${encodeURIComponent(columnName)}`, {
+      method: 'DELETE',
+    }),
 
   saveColumnName: (columnName: string) =>
     request<{ saved: string }>('/ferramentas/mapeamentos', {

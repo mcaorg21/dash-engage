@@ -88,6 +88,101 @@ function parseSheetColumn(buffer: Buffer, column: string): unknown[] {
   }
 }
 
+function parseSheetFirstValue(buffer: Buffer, column: string): string | null {
+  try {
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) return null;
+    const sheet = workbook.Sheets[sheetName];
+    const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: true });
+    const colLower = column.toLowerCase();
+
+    let headerRowIdx = -1;
+    let colIdx = -1;
+    for (let i = 0; i < Math.min(allRows.length, 30); i++) {
+      const row = allRows[i];
+      if (!Array.isArray(row)) continue;
+      const idx = row.findIndex(v => v != null && String(v).trim().toLowerCase() === colLower);
+      if (idx !== -1) { headerRowIdx = i; colIdx = idx; break; }
+    }
+    if (headerRowIdx === -1) return null;
+
+    for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+      const row = allRows[i] as unknown[];
+      if (!Array.isArray(row)) continue;
+      const v = row[colIdx];
+      if (v != null && v !== '') return String(v);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function parseSheetCell(buffer: Buffer, cellRef: string): string | null {
+  try {
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) return null;
+    const sheet = workbook.Sheets[sheetName];
+    const cell = sheet[cellRef];
+    if (!cell || cell.v == null || cell.v === '') return null;
+    return String(cell.v);
+  } catch {
+    return null;
+  }
+}
+
+function parseSheetColumnSum(buffer: Buffer, column: string, skipLastRows = 0): number | null {
+  try {
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) return null;
+    const sheet = workbook.Sheets[sheetName];
+    const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: true });
+    const colLower = column.toLowerCase();
+
+    let headerRowIdx = -1;
+    let colIdx = -1;
+    for (let i = 0; i < Math.min(allRows.length, 30); i++) {
+      const row = allRows[i];
+      if (!Array.isArray(row)) continue;
+      const idx = row.findIndex(v => v != null && String(v).trim().toLowerCase() === colLower);
+      if (idx !== -1) { headerRowIdx = i; colIdx = idx; break; }
+    }
+    if (headerRowIdx === -1) return null;
+
+    // Coleta todos os valores numéricos da coluna
+    const nums: number[] = [];
+    for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+      const row = allRows[i] as unknown[];
+      if (!Array.isArray(row)) continue;
+      const v = row[colIdx];
+      if (v != null && v !== '') {
+        let num: number;
+        if (typeof v === 'number') {
+          num = v;
+        } else {
+          const s = String(v).trim().replace(/\./g, '').replace(',', '.');
+          num = parseFloat(s);
+        }
+        if (!isNaN(num)) nums.push(num);
+      }
+    }
+
+    // Remove os últimos N valores não-vazios (ex: linha de total)
+    const values = skipLastRows > 0 ? nums.slice(0, -skipLastRows) : nums;
+    if (values.length === 0) return null;
+
+    const sum = values.reduce((a, b) => a + b, 0);
+    const integerCount = values.filter(n => n % 1 === 0).length;
+    const likelyCentavos = (integerCount / values.length) >= 0.9;
+    return likelyCentavos ? sum / 100 : sum;
+  } catch {
+    return null;
+  }
+}
+
 function apiKeyOrJwt(req: AuthRequest, res: Response, next: NextFunction) {
   const apiKey = req.headers['x-api-key'];
   if (apiKey) {
@@ -238,10 +333,48 @@ router.get('/planilhas/columns', async (req: AuthRequest, res) => {
       return;
     }
     const [buffer] = await gcs.bucket(BUCKET_NAME).file(filename).download();
-    res.json(parseSheetHeaders(buffer));
+    const headers = parseSheetHeaders(buffer);
+    const cvValue = parseSheetFirstValue(buffer, 'NUMERO DA FATURA')
+      ?? parseSheetCell(buffer, 'E3')
+      ?? 'NAO_ENCONTRADO';
+
+    // Tenta colunas padrão, depois as salvas no dicionário
+    let cpSum = parseSheetColumnSum(buffer, 'BASE CALC')
+      ?? parseSheetColumnSum(buffer, 'Frete', 1);
+    if (cpSum == null) {
+      try {
+        await pool.query(`CREATE TABLE IF NOT EXISTS saved_value_column_names (column_name TEXT PRIMARY KEY)`);
+        const { rows } = await pool.query<{ column_name: string }>(
+          'SELECT column_name FROM saved_value_column_names ORDER BY column_name',
+        );
+        for (const { column_name } of rows) {
+          cpSum = parseSheetColumnSum(buffer, column_name);
+          if (cpSum != null) break;
+        }
+      } catch { /* ignora erro de DB */ }
+    }
+
+    res.json({ headers, cvValue, cpSum });
   } catch (err) {
     console.error('GCS columns error:', err);
     res.status(500).json({ error: 'Erro ao ler colunas do arquivo.' });
+  }
+});
+
+router.get('/planilhas/column-sum', async (req: AuthRequest, res) => {
+  try {
+    const filename = String(req.query.file || '');
+    const column = String(req.query.column || '');
+    if (!filename || !column) {
+      res.status(400).json({ error: 'file e column sao obrigatorios.' });
+      return;
+    }
+    const [buffer] = await gcs.bucket(BUCKET_NAME).file(filename).download();
+    const sum = parseSheetColumnSum(buffer, column);
+    res.json({ sum });
+  } catch (err) {
+    console.error('GCS column-sum error:', err);
+    res.status(500).json({ error: 'Erro ao calcular soma da coluna.' });
   }
 });
 
@@ -260,6 +393,50 @@ router.get('/planilhas/download', async (req: AuthRequest, res) => {
   } catch (err) {
     console.error('GCS download error:', err);
     res.status(500).json({ error: 'Erro ao baixar arquivo.' });
+  }
+});
+
+// ── Mapeamentos de valor — lista global de colunas de valor das CTe's ────────
+
+router.get('/mapeamentos/valores', async (_req: AuthRequest, res) => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS saved_value_column_names (
+      column_name TEXT PRIMARY KEY
+    )`);
+    const { rows } = await pool.query<{ column_name: string }>(
+      'SELECT column_name FROM saved_value_column_names ORDER BY column_name',
+    );
+    res.json(rows.map(r => r.column_name));
+  } catch (err) {
+    console.error('DB mapeamentos/valores error:', err);
+    res.status(500).json({ error: 'Erro ao buscar mapeamentos de valor.' });
+  }
+});
+
+router.post('/mapeamentos/valores', async (req: AuthRequest, res) => {
+  try {
+    const columnName = String(req.body?.columnName || '').trim();
+    if (!columnName) { res.status(400).json({ error: 'columnName e obrigatorio.' }); return; }
+    await pool.query(`CREATE TABLE IF NOT EXISTS saved_value_column_names (column_name TEXT PRIMARY KEY)`);
+    await pool.query(
+      `INSERT INTO saved_value_column_names (column_name) VALUES ($1) ON CONFLICT DO NOTHING`,
+      [columnName],
+    );
+    res.json({ saved: columnName });
+  } catch (err) {
+    console.error('DB save value column error:', err);
+    res.status(500).json({ error: 'Erro ao salvar coluna de valor.' });
+  }
+});
+
+router.delete('/mapeamentos/valores/:columnName', async (req: AuthRequest, res) => {
+  try {
+    const columnName = decodeURIComponent(req.params.columnName);
+    await pool.query('DELETE FROM saved_value_column_names WHERE column_name = $1', [columnName]);
+    res.json({ deleted: columnName });
+  } catch (err) {
+    console.error('DB delete value column error:', err);
+    res.status(500).json({ error: 'Erro ao remover coluna de valor.' });
   }
 });
 
