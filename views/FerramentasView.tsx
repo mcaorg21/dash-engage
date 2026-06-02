@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle2, ChevronDown, Copy, Download, FileSpreadsheet, Loader2, Save, Search, Trash2, Upload, X } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Copy, Download, FileSpreadsheet, Loader2, RefreshCw, Save, Search, Trash2, Upload, X } from 'lucide-react';
 import { api, type BucketFile } from '../utils/api';
 import { useModal } from '../components/useModal';
 import { TRANSPORTADORAS } from '../utils/transportadoras';
@@ -153,6 +153,9 @@ const PlanilhasView = () => {
   const [classifyingCp, setClassifyingCp] = useState<Record<string, string>>({});
   const [loadingCpSum, setLoadingCpSum] = useState<Record<string, boolean>>({});
   const [savedValueColumns, setSavedValueColumns] = useState<string[]>([]);
+  const [syncingFile, setSyncingFile] = useState<string | null>(null);
+  const [syncResults, setSyncResults] = useState<Record<string, { sent: number; valorTotal: number; status: number; sql?: string; retorno?: boolean } | null>>({});
+  const [copiedSql, setCopiedSql] = useState<string | null>(null);
 
   // Global saved column names (DB)
   const [savedColumnNames, setSavedColumnNames] = useState<string[]>([]);
@@ -350,6 +353,27 @@ const PlanilhasView = () => {
     } finally {
       setLoadingColumns(prev => ({ ...prev, [filename]: false }));
     }
+  };
+
+  const handleSincronizar = async (filename: string, cteColumn: string) => {
+    setSyncingFile(filename);
+    try {
+      const result = await api.sincronizarPlanilha(filename, cteColumn);
+      const body = result.webhook.body as any;
+      const retorno = body?.retorno === true;
+      const sql = typeof body?.sql === 'string' ? body.sql : undefined;
+      setSyncResults(prev => ({ ...prev, [filename]: { sent: result.sent, valorTotal: result.valorTotal, status: result.webhook.status, retorno, sql } }));
+    } catch (err: any) {
+      await alert(err.message || 'Erro ao sincronizar.', 'Erro');
+    } finally {
+      setSyncingFile(null);
+    }
+  };
+
+  const handleCopySql = (filename: string, sql: string) => {
+    navigator.clipboard.writeText(sql);
+    setCopiedSql(filename);
+    setTimeout(() => setCopiedSql(null), 2000);
   };
 
   const handleClassifyCp = async (filename: string) => {
@@ -649,6 +673,41 @@ const PlanilhasView = () => {
                                     {loadingCpSum[file.name] ? <Loader2 size={12} className="animate-spin" /> : 'Calcular'}
                                   </button>
                                 </div>
+                              )}
+                            </div>
+
+                            <div className="mb-0.5 h-8 w-px shrink-0 self-end bg-slate-200" />
+
+                            {/* Conciliar */}
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs font-semibold text-slate-400">Conciliar</span>
+                              {syncResults[file.name] ? (
+                                <div className="flex items-center gap-2">
+                                  <span className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold ${syncResults[file.name]!.retorno ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                                    {syncResults[file.name]!.retorno ? <CheckCircle2 size={13} /> : null}
+                                    {syncResults[file.name]!.sent} CTe's · {syncResults[file.name]!.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                  </span>
+                                  {syncResults[file.name]!.retorno && syncResults[file.name]!.sql && (
+                                    <button type="button"
+                                      onClick={() => handleCopySql(file.name, syncResults[file.name]!.sql!)}
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-700">
+                                      {copiedSql === file.name ? <CheckCircle2 size={12} /> : <Copy size={12} />}
+                                      {copiedSql === file.name ? 'Copiado!' : 'SQL'}
+                                    </button>
+                                  )}
+                                  <button type="button" onClick={() => setSyncResults(prev => ({ ...prev, [file.name]: null }))}
+                                    title="Reenviar" className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
+                                    <RefreshCw size={13} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button type="button"
+                                  onClick={() => handleSincronizar(file.name, colSelected)}
+                                  disabled={!colSelected || !transpEdit.trim() || !transpTitulo.trim() || syncingFile === file.name}
+                                  title="Conciliar"
+                                  className="inline-flex items-center justify-center rounded-lg bg-violet-50 p-2 text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-40">
+                                  {syncingFile === file.name ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                                </button>
                               )}
                             </div>
                           </>

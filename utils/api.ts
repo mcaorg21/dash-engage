@@ -171,6 +171,12 @@ export const api = {
   getPlanilhaColumnSum: (filename: string, column: string) =>
     request<{ sum: number | null }>(`/ferramentas/planilhas/column-sum?file=${encodeURIComponent(filename)}&column=${encodeURIComponent(column)}`),
 
+  sincronizarPlanilha: (filename: string, cteColumn: string) =>
+    request<{ sent: number; valorTotal: number; webhook: { status: number; body: unknown } }>(
+      '/ferramentas/planilhas/sincronizar',
+      { method: 'POST', body: JSON.stringify({ file: filename, cteColumn }) },
+    ),
+
   extractPlanilhas: () =>
     request<ExtractRow[]>('/ferramentas/planilhas/extract'),
 

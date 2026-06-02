@@ -88,6 +88,77 @@ function parseSheetColumn(buffer: Buffer, column: string): unknown[] {
   }
 }
 
+const SYNC_WEBHOOK = 'https://primary-production-1a8e5.up.railway.app/webhook/2c2b8aee-2983-44f2-b334-052aa8f4596b-sincroniza-planilha-cte';
+
+function parseSheetCteRows(
+  buffer: Buffer,
+  cteColumn: string,
+  valueColumns: string[],
+  skipLastRows = 0,
+): { chave: string; valor: number | null }[] {
+  try {
+    // cellText: true + raw: false preserva chaves CTE como texto completo (evita notação científica)
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellText: true });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) return [];
+    const sheet = workbook.Sheets[sheetName];
+    const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: false });
+    const colLower = (c: string) => c.toLowerCase();
+
+    // Encontra coluna de chave CTE
+    let headerRowIdx = -1;
+    let cteIdx = -1;
+    for (let i = 0; i < Math.min(allRows.length, 30); i++) {
+      const row = allRows[i];
+      if (!Array.isArray(row)) continue;
+      const idx = row.findIndex(v => v != null && String(v).trim().toLowerCase() === colLower(cteColumn));
+      if (idx !== -1) { headerRowIdx = i; cteIdx = idx; break; }
+    }
+    if (headerRowIdx === -1 || cteIdx === -1) return [];
+
+    // Encontra coluna de valor (tenta na ordem)
+    let valIdx = -1;
+    for (const vc of valueColumns) {
+      const headerRow = allRows[headerRowIdx];
+      if (!Array.isArray(headerRow)) continue;
+      const idx = headerRow.findIndex(v => v != null && String(v).trim().toLowerCase() === colLower(vc));
+      if (idx !== -1) { valIdx = idx; break; }
+    }
+
+    const dataRows = allRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
+    const pairs: { chave: string; valor: number | null }[] = [];
+
+    for (const row of dataRows) {
+      if (!Array.isArray(row)) continue;
+      const chaveRaw = row[cteIdx];
+      if (chaveRaw == null || chaveRaw === '') continue;
+      const chave = String(chaveRaw).trim();
+
+      let valor: number | null = null;
+      if (valIdx !== -1) {
+        const v = row[valIdx];
+        if (v != null && v !== '') {
+          const num = typeof v === 'number' ? v : parseFloat(String(v).replace(/\./g, '').replace(',', '.'));
+          if (!isNaN(num)) valor = num;
+        }
+      }
+      pairs.push({ chave, valor });
+    }
+
+    // Detecta se valores estão em centavos (>=90% inteiros)
+    const numericVals = pairs.map(p => p.valor).filter((v): v is number => v != null);
+    if (numericVals.length > 0) {
+      const intCount = numericVals.filter(v => v % 1 === 0).length;
+      if (intCount / numericVals.length >= 0.9) {
+        return pairs.map(p => ({ ...p, valor: p.valor != null ? p.valor / 100 : null }));
+      }
+    }
+    return pairs;
+  } catch {
+    return [];
+  }
+}
+
 function parseSheetFirstValue(buffer: Buffer, column: string): string | null {
   try {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
@@ -375,6 +446,51 @@ router.get('/planilhas/column-sum', async (req: AuthRequest, res) => {
   } catch (err) {
     console.error('GCS column-sum error:', err);
     res.status(500).json({ error: 'Erro ao calcular soma da coluna.' });
+  }
+});
+
+router.post('/planilhas/sincronizar', async (req: AuthRequest, res) => {
+  try {
+    const filename = String(req.body?.file || '');
+    const cteColumn = String(req.body?.cteColumn || '');
+    if (!filename || !cteColumn) {
+      res.status(400).json({ error: 'file e cteColumn sao obrigatorios.' });
+      return;
+    }
+
+    const [buffer] = await gcs.bucket(BUCKET_NAME).file(filename).download();
+    const [fileMeta] = await gcs.bucket(BUCKET_NAME).file(filename).getMetadata();
+    const rawTransportadora: string = (fileMeta as any).metadata?.transportadora ?? '';
+    // Remove espaço entre sigla e título: "ALF 87452" → "ALF87452"
+    const transportadora_titulo = rawTransportadora.replace(/\s+/g, '');
+
+    // Tenta colunas de valor na mesma ordem do endpoint /columns
+    const { rows: vcRows } = await pool.query<{ column_name: string }>(
+      'SELECT column_name FROM saved_value_column_names ORDER BY column_name',
+    ).catch(() => ({ rows: [] }));
+    const savedValueCols = vcRows.map(r => r.column_name);
+    const valueColumns = ['BASE CALC', 'Frete', ...savedValueCols];
+
+    const ctes = parseSheetCteRows(buffer, cteColumn, valueColumns, valueColumns.includes('Frete') ? 1 : 0);
+    const valorTotal = ctes.reduce((sum, c) => sum + (c.valor ?? 0), 0);
+
+    const chaves_cte = ctes.map(c => `'${c.chave}'`).join(',');
+    const total_ctes = ctes.length;
+    const payload = { transportadora_titulo, arquivo: filename, valorTotal, total_ctes, chaves_cte, ctes };
+
+    const webhookRes = await fetch(SYNC_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const webhookBody = await webhookRes.text();
+    let webhookJson: unknown;
+    try { webhookJson = JSON.parse(webhookBody); } catch { webhookJson = webhookBody; }
+
+    res.json({ sent: ctes.length, valorTotal, webhook: { status: webhookRes.status, body: webhookJson } });
+  } catch (err) {
+    console.error('Sincronizar error:', err);
+    res.status(500).json({ error: 'Erro ao sincronizar planilha.' });
   }
 });
 
