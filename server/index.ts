@@ -27,8 +27,17 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
 if (isProd) {
   const distPath = path.resolve(__dirname, '../dist');
-  app.use(express.static(distPath));
-  app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+  // Assets com hash no nome: cache longo
+  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+  }));
+  // index.html: sem cache para sempre pegar a versão mais recente
+  app.use(express.static(distPath, { maxAge: 0, etag: false }));
+  app.get('*', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
 }
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3142;
