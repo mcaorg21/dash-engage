@@ -285,52 +285,42 @@ const QivezPainelView = () => {
                               const x = groupStart(index) + item.offset - barWidth / 2;
                               const y = yFor(value);
 
+                              const tooltipData = {
+                                x: x + barWidth / 2,
+                                y,
+                                mes: formatMonthPt(row.mes),
+                                label: item.label,
+                                value,
+                                percent,
+                                id: `${row.mes}-${item.key}`,
+                              };
                               return (
-                                <rect
-                                  key={item.key}
-                                  x={x}
-                                  y={y}
-                                  width={barWidth}
-                                  height={Math.max(height, value > 0 ? 3 : 0)}
-                                  rx="4"
-                                  fill={item.color}
-                                  className="cursor-pointer transition-opacity hover:opacity-80"
-                                  onMouseEnter={() => {
-                                    if (isChartTooltipPinned) return;
-                                    setChartTooltip({
-                                      x: x + barWidth / 2,
-                                      y,
-                                      mes: formatMonthPt(row.mes),
-                                      label: item.label,
-                                      value,
-                                      percent,
-                                      id: `${row.mes}-${item.key}`,
-                                    });
-                                  }}
-                                  onMouseLeave={() => {
-                                    if (!isChartTooltipPinned) setChartTooltip(null);
-                                  }}
-                                  onClick={() => {
-                                    const nextTooltip = {
-                                      x: x + barWidth / 2,
-                                      y,
-                                      mes: formatMonthPt(row.mes),
-                                      label: item.label,
-                                      value,
-                                      percent,
-                                      id: `${row.mes}-${item.key}`,
-                                    };
-
-                                    if (isChartTooltipPinned && chartTooltip?.id === nextTooltip.id) {
-                                      setIsChartTooltipPinned(false);
-                                      setChartTooltip(null);
-                                      return;
-                                    }
-
-                                    setChartTooltip(nextTooltip);
-                                    setIsChartTooltipPinned(true);
-                                  }}
-                                />
+                                <g key={item.key}>
+                                  {/* Área de hover invisível por toda a altura da coluna */}
+                                  <rect
+                                    x={x}
+                                    y={40}
+                                    width={barWidth}
+                                    height={232}
+                                    fill="transparent"
+                                    className="cursor-pointer"
+                                    onMouseEnter={() => { if (!isChartTooltipPinned) setChartTooltip(tooltipData); }}
+                                    onMouseLeave={() => { if (!isChartTooltipPinned) setChartTooltip(null); }}
+                                    onClick={() => {
+                                      if (isChartTooltipPinned && chartTooltip?.id === tooltipData.id) {
+                                        setIsChartTooltipPinned(false); setChartTooltip(null);
+                                      } else { setChartTooltip(tooltipData); setIsChartTooltipPinned(true); }
+                                    }}
+                                  />
+                                  <rect
+                                    x={x}
+                                    y={y}
+                                    width={barWidth}
+                                    height={Math.max(height, value > 0 ? 10 : 0)}
+                                    rx="4"
+                                    fill={item.color}
+                                    className="pointer-events-none transition-opacity"
+                                  /></g>
                               );
                             })}
                           </g>
