@@ -31,9 +31,9 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
         SELECT
             DATE_TRUNC('month', data_lancamento::timestamptz AT TIME ZONE 'America/Sao_Paulo') AS mes,
             COUNT(DISTINCT chave_cte)::int AS total,
-            COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false)::int AS total_false,
-            COALESCE(SUM(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false), 0)::float AS soma_false,
-            COALESCE(AVG(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false), 0)::float AS media_false
+            COUNT(DISTINCT chave_cte) FILTER (WHERE cancelada = false AND (existe_qives_sysemp = false OR existe_sysemp_qives = false))::int AS total_false,
+            COALESCE(SUM(diferenca_valor) FILTER (WHERE cancelada = false AND (existe_qives_sysemp = false OR existe_sysemp_qives = false)), 0)::float AS soma_false,
+            COALESCE(AVG(diferenca_valor) FILTER (WHERE cancelada = false AND (existe_qives_sysemp = false OR existe_sysemp_qives = false)), 0)::float AS media_false
         FROM lancamentos_financeiros
         GROUP BY 1
         ORDER BY 1
