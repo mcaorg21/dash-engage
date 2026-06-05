@@ -59,10 +59,7 @@ const QivezPlaceholderView = ({ tab }: { tab: string }) => {
 
 const formatMonthPt = (value: unknown) => {
   if (!value) return '-';
-  // Garante interpretação em UTC independente do formato retornado pelo banco
-  const str = String(value).replace(' ', 'T');
-  const normalized = str.endsWith('Z') || str.includes('+') ? str : str + 'Z';
-  const date = new Date(normalized);
+  const date = new Date(String(value));
   if (Number.isNaN(date.getTime())) return formatCellValue(value);
 
   return date.toLocaleDateString('pt-BR', {
