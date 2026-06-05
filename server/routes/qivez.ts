@@ -29,7 +29,7 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
     const [monthly, canceladosResult] = await Promise.all([
       pool.query(`
         SELECT
-            DATE_TRUNC('month', data_lancamento) AS mes,
+            DATE_TRUNC('month', data_lancamento::timestamptz AT TIME ZONE 'America/Sao_Paulo') AS mes,
             COUNT(DISTINCT chave_cte)::int AS total,
             COUNT(DISTINCT chave_cte) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false)::int AS total_false,
             COALESCE(SUM(diferenca_valor) FILTER (WHERE existe_qives_sysemp = false AND cancelada = false), 0)::float AS soma_false,
