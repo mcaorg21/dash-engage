@@ -159,30 +159,38 @@ function parseSheetCteRows(
   }
 }
 
-function parseSheetFirstValue(buffer: Buffer, column: string): string | null {
+function parseSheetFirstValue(buffer: Buffer, column: string, partial = false): string | null {
   try {
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellText: true });
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) return null;
     const sheet = workbook.Sheets[sheetName];
-    const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: true });
-    const colLower = column.toLowerCase();
+    const colLower = column.trim().toLowerCase();
 
-    let headerRowIdx = -1;
-    let colIdx = -1;
-    for (let i = 0; i < Math.min(allRows.length, 30); i++) {
-      const row = allRows[i];
-      if (!Array.isArray(row)) continue;
-      const idx = row.findIndex(v => v != null && String(v).trim().toLowerCase() === colLower);
-      if (idx !== -1) { headerRowIdx = i; colIdx = idx; break; }
-    }
-    if (headerRowIdx === -1) return null;
+    // Tenta com raw:false (texto formatado) e raw:true para maior compatibilidade
+    for (const raw of [false, true]) {
+      const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw });
+      let headerRowIdx = -1;
+      let colIdx = -1;
+      for (let i = 0; i < Math.min(allRows.length, 30); i++) {
+        const row = allRows[i];
+        if (!Array.isArray(row)) continue;
+        const idx = row.findIndex(v => {
+          if (v == null) return false;
+          const s = String(v).trim().replace(/\s+/g, ' ').toLowerCase();
+          return partial ? s.includes(colLower) : s === colLower;
+        });
+        if (idx !== -1) { headerRowIdx = i; colIdx = idx; break; }
+      }
+      if (headerRowIdx === -1) continue;
 
-    for (let i = headerRowIdx + 1; i < allRows.length; i++) {
-      const row = allRows[i] as unknown[];
-      if (!Array.isArray(row)) continue;
-      const v = row[colIdx];
-      if (v != null && v !== '') return String(v);
+      const dataRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: true });
+      for (let i = headerRowIdx + 1; i < dataRows.length; i++) {
+        const row = dataRows[i] as unknown[];
+        if (!Array.isArray(row)) continue;
+        const v = row[colIdx];
+        if (v != null && v !== '') return String(v);
+      }
     }
     return null;
   } catch {
@@ -406,6 +414,7 @@ router.get('/planilhas/columns', async (req: AuthRequest, res) => {
     const [buffer] = await gcs.bucket(BUCKET_NAME).file(filename).download();
     const headers = parseSheetHeaders(buffer);
     const cvValue = parseSheetFirstValue(buffer, 'NUMERO DA FATURA')
+      ?? parseSheetFirstValue(buffer, 'fatura', true)
       ?? parseSheetCell(buffer, 'E3')
       ?? 'NAO_ENCONTRADO';
 
@@ -446,6 +455,55 @@ router.get('/planilhas/column-sum', async (req: AuthRequest, res) => {
   } catch (err) {
     console.error('GCS column-sum error:', err);
     res.status(500).json({ error: 'Erro ao calcular soma da coluna.' });
+  }
+});
+
+const SIGLA_WEBHOOK = 'https://primary-production-1a8e5.up.railway.app/webhook/ae94c030-88ab-4410-9478-599b56f27664-retorna-sigla';
+
+router.get('/planilhas/detect-sigla', async (req: AuthRequest, res) => {
+  try {
+    const filename = String(req.query.file || '');
+    const cteColumn = String(req.query.cteColumn || '');
+    if (!filename || !cteColumn) {
+      res.status(400).json({ error: 'file e cteColumn sao obrigatorios.' });
+      return;
+    }
+
+    const [buffer] = await gcs.bucket(BUCKET_NAME).file(filename).download();
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellText: true });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) { res.json({ sigla: null }); return; }
+    const sheet = workbook.Sheets[sheetName];
+    const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: false });
+    const colLower = cteColumn.trim().toLowerCase();
+
+    let headerRowIdx = -1, colIdx = -1;
+    for (let i = 0; i < Math.min(allRows.length, 30); i++) {
+      const row = allRows[i];
+      if (!Array.isArray(row)) continue;
+      const idx = row.findIndex(v => v != null && String(v).trim().replace(/\s+/g, ' ').toLowerCase() === colLower);
+      if (idx !== -1) { headerRowIdx = i; colIdx = idx; break; }
+    }
+    if (headerRowIdx === -1) { res.json({ sigla: null }); return; }
+
+    let chaveCteSample: string | null = null;
+    const dataRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: true });
+    for (let i = headerRowIdx + 1; i < dataRows.length; i++) {
+      const row = dataRows[i] as unknown[];
+      if (!Array.isArray(row)) continue;
+      const v = row[colIdx];
+      if (v != null && v !== '') { chaveCteSample = String(v); break; }
+    }
+
+    if (!chaveCteSample) { res.json({ sigla: null }); return; }
+
+    const webhookRes = await fetch(`${SIGLA_WEBHOOK}?chave_cte=${encodeURIComponent(chaveCteSample)}`);
+    if (!webhookRes.ok) { res.json({ sigla: null }); return; }
+    const data = await webhookRes.json() as { sigla?: string; transportadora?: string };
+    res.json({ sigla: data.sigla ?? null, transportadora: data.transportadora ?? null });
+  } catch (err) {
+    console.error('detect-sigla error:', err);
+    res.json({ sigla: null });
   }
 });
 

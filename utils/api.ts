@@ -171,6 +171,11 @@ export const api = {
   getPlanilhaColumnSum: (filename: string, column: string) =>
     request<{ sum: number | null }>(`/ferramentas/planilhas/column-sum?file=${encodeURIComponent(filename)}&column=${encodeURIComponent(column)}`),
 
+  detectSigla: (filename: string, cteColumn: string) =>
+    request<{ sigla: string | null; transportadora: string | null }>(
+      `/ferramentas/planilhas/detect-sigla?file=${encodeURIComponent(filename)}&cteColumn=${encodeURIComponent(cteColumn)}`
+    ),
+
   sincronizarPlanilha: (filename: string, cteColumn: string) =>
     request<{ sent: number; valorTotal: number; webhook: { status: number; body: unknown } }>(
       '/ferramentas/planilhas/sincronizar',

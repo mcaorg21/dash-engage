@@ -272,7 +272,7 @@ const PlanilhasView = () => {
     setDeletingFile(file.name);
     try {
       await api.deletePlanilha(file.name);
-      await loadFiles();
+      setBucketFiles(prev => prev.filter(f => f.name !== file.name));
     } catch (err: any) {
       await alert(err.message || 'Erro ao deletar arquivo.', 'Erro');
     } finally {
@@ -322,6 +322,12 @@ const PlanilhasView = () => {
       const autoMatch = headers.find(c => savedSet.has(c));
       if (autoMatch) {
         setSelectedColumn(prev => ({ ...prev, [filename]: autoMatch }));
+        // Detecta sigla automaticamente via n8n se ainda não preenchida
+        if (!editTransportadoras[filename]?.trim()) {
+          api.detectSigla(filename, autoMatch).then(({ sigla }) => {
+            if (sigla) setEditTransportadoras(prev => ({ ...prev, [filename]: sigla }));
+          }).catch(() => {});
+        }
       }
       // Preenche Título com o primeiro valor da coluna NUMERO DA FATURA
       // Se NAO_ENCONTRADO, preserva o que já estava preenchido
