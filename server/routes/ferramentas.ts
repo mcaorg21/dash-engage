@@ -499,8 +499,10 @@ router.get('/planilhas/detect-sigla', async (req: AuthRequest, res) => {
 
     const webhookRes = await fetch(`${SIGLA_WEBHOOK}?chave_cte=${encodeURIComponent(chaveCteSample)}`);
     if (!webhookRes.ok) { res.json({ sigla: null }); return; }
-    const data = await webhookRes.json() as { sigla?: string; transportadora?: string };
-    res.json({ sigla: data.sigla ?? null, transportadora: data.transportadora ?? null });
+    const raw = await webhookRes.json();
+    // n8n pode retornar array ou objeto direto
+    const data: { sigla?: string; transportadora?: string } = Array.isArray(raw) ? raw[0] : raw;
+    res.json({ sigla: data?.sigla ?? null, transportadora: data?.transportadora ?? null });
   } catch (err) {
     console.error('detect-sigla error:', err);
     res.json({ sigla: null });

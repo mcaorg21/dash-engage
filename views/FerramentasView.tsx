@@ -243,7 +243,7 @@ const PlanilhasView = () => {
         if (!editTransportadoras[filename]?.trim()) {
           api.detectSigla(filename, match).then(({ sigla }) => {
             if (sigla) setEditTransportadoras(prev => ({ ...prev, [filename]: sigla }));
-          }).catch(() => {});
+          }).catch(err => console.warn('detect-sigla retry:', err));
         }
       }
     });
@@ -345,7 +345,7 @@ const PlanilhasView = () => {
         if (!editTransportadoras[filename]?.trim()) {
           api.detectSigla(filename, autoMatch).then(({ sigla }) => {
             if (sigla) setEditTransportadoras(prev => ({ ...prev, [filename]: sigla }));
-          }).catch(() => {});
+          }).catch(err => console.warn('detect-sigla:', err));
         }
       }
       // Preenche Título com o primeiro valor da coluna NUMERO DA FATURA
