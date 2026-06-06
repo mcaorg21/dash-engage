@@ -521,7 +521,9 @@ router.post('/planilhas/sincronizar', async (req: AuthRequest, res) => {
     const [buffer] = await gcs.bucket(BUCKET_NAME).file(filename).download();
     const [fileMeta] = await gcs.bucket(BUCKET_NAME).file(filename).getMetadata();
     const rawTransportadora: string = (fileMeta as any).metadata?.transportadora ?? '';
-    // Remove espaço entre sigla e título: "ALF 87452" → "ALF87452"
+    const metaParts = rawTransportadora.split(' ');
+    const sigla = metaParts[0] ?? '';
+    const titulo = metaParts.slice(1).join(' ');
     const transportadora_titulo = rawTransportadora.replace(/\s+/g, '');
 
     // Tenta colunas de valor na mesma ordem do endpoint /columns
@@ -536,7 +538,7 @@ router.post('/planilhas/sincronizar', async (req: AuthRequest, res) => {
 
     const chaves_cte = ctes.map(c => `'${c.chave}'`).join(',');
     const total_ctes = ctes.length;
-    const payload = { transportadora_titulo, arquivo: filename, valorTotal, total_ctes, chaves_cte, ctes };
+    const payload = { sigla, titulo, transportadora_titulo, arquivo: filename, valorTotal, total_ctes, chaves_cte, ctes };
 
     const webhookRes = await fetch(SYNC_WEBHOOK, {
       method: 'POST',
