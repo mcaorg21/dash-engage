@@ -385,7 +385,8 @@ const PlanilhasView = () => {
     setSyncingFile(filename);
     try {
       const result = await api.sincronizarPlanilha(filename, cteColumn, sigla, titulo);
-      const body = result.webhook.body as any;
+      const rawBody = result.webhook.body as any;
+      const body = Array.isArray(rawBody) ? rawBody[0] : rawBody;
       const retorno = body?.retorno === true;
       const sql = typeof body?.sql === 'string' ? body.sql : undefined;
       setSyncResults(prev => ({ ...prev, [filename]: { sent: result.sent, valorTotal: result.valorTotal, status: result.webhook.status, retorno, sql } }));
