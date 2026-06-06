@@ -235,7 +235,8 @@ const PlanilhasView = () => {
   useEffect(() => {
     if (savedColumnNames.length === 0) return;
     const savedSet = new Set(savedColumnNames);
-    Object.entries(fileColumns).forEach(([filename, cols]) => {
+    Object.entries(fileColumns).forEach(([filename, colsRaw]) => {
+      const cols = colsRaw as string[] | undefined;
       if (!cols || selectedColumn[filename]) return;
       const match = cols.find(c => savedSet.has(c));
       if (match) {
