@@ -231,6 +231,25 @@ const PlanilhasView = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bucketFiles.length]);
 
+  // Re-tenta auto-select quando savedColumnNames carrega (resolve race condition)
+  useEffect(() => {
+    if (savedColumnNames.length === 0) return;
+    const savedSet = new Set(savedColumnNames);
+    Object.entries(fileColumns).forEach(([filename, cols]) => {
+      if (!cols || selectedColumn[filename]) return;
+      const match = cols.find(c => savedSet.has(c));
+      if (match) {
+        setSelectedColumn(prev => ({ ...prev, [filename]: match }));
+        if (!editTransportadoras[filename]?.trim()) {
+          api.detectSigla(filename, match).then(({ sigla }) => {
+            if (sigla) setEditTransportadoras(prev => ({ ...prev, [filename]: sigla }));
+          }).catch(() => {});
+        }
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedColumnNames]);
+
   const addFiles = (incoming: FileList | File[]) => {
     const arr = Array.from(incoming).filter(f =>
       ACCEPTED.some(ext => f.name.toLowerCase().endsWith(ext)),
