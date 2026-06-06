@@ -487,7 +487,7 @@ router.get('/planilhas/detect-sigla', async (req: AuthRequest, res) => {
     if (headerRowIdx === -1) { res.json({ sigla: null }); return; }
 
     let chaveCteSample: string | null = null;
-    const dataRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: true });
+    const dataRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: false });
     for (let i = headerRowIdx + 1; i < dataRows.length; i++) {
       const row = dataRows[i] as unknown[];
       if (!Array.isArray(row)) continue;
