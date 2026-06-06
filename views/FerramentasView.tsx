@@ -381,10 +381,10 @@ const PlanilhasView = () => {
     }
   };
 
-  const handleSincronizar = async (filename: string, cteColumn: string) => {
+  const handleSincronizar = async (filename: string, cteColumn: string, sigla: string, titulo: string) => {
     setSyncingFile(filename);
     try {
-      const result = await api.sincronizarPlanilha(filename, cteColumn);
+      const result = await api.sincronizarPlanilha(filename, cteColumn, sigla, titulo);
       const body = result.webhook.body as any;
       const retorno = body?.retorno === true;
       const sql = typeof body?.sql === 'string' ? body.sql : undefined;
@@ -728,7 +728,7 @@ const PlanilhasView = () => {
                                 </div>
                               ) : (
                                 <button type="button"
-                                  onClick={() => handleSincronizar(file.name, colSelected)}
+                                  onClick={() => handleSincronizar(file.name, colSelected, transpEdit, transpTitulo)}
                                   disabled={!colSelected || !transpEdit.trim() || !transpTitulo.trim() || syncingFile === file.name}
                                   title="Conciliar"
                                   className="inline-flex items-center justify-center rounded-lg bg-violet-50 p-2 text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-40">

@@ -176,10 +176,10 @@ export const api = {
       `/ferramentas/planilhas/detect-sigla?file=${encodeURIComponent(filename)}&cteColumn=${encodeURIComponent(cteColumn)}`
     ),
 
-  sincronizarPlanilha: (filename: string, cteColumn: string) =>
+  sincronizarPlanilha: (filename: string, cteColumn: string, sigla: string, titulo: string) =>
     request<{ sent: number; valorTotal: number; webhook: { status: number; body: unknown } }>(
       '/ferramentas/planilhas/sincronizar',
-      { method: 'POST', body: JSON.stringify({ file: filename, cteColumn }) },
+      { method: 'POST', body: JSON.stringify({ file: filename, cteColumn, sigla, titulo }) },
     ),
 
   extractPlanilhas: () =>

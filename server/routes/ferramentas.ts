@@ -518,13 +518,11 @@ router.post('/planilhas/sincronizar', async (req: AuthRequest, res) => {
       return;
     }
 
+    const sigla = String(req.body?.sigla ?? '').trim();
+    const titulo = String(req.body?.titulo ?? '').trim();
+    const transportadora_titulo = (sigla + titulo).replace(/\s+/g, '');
+
     const [buffer] = await gcs.bucket(BUCKET_NAME).file(filename).download();
-    const [fileMeta] = await gcs.bucket(BUCKET_NAME).file(filename).getMetadata();
-    const rawTransportadora: string = (fileMeta as any).metadata?.transportadora ?? '';
-    const metaParts = rawTransportadora.split(' ');
-    const sigla = metaParts[0] ?? '';
-    const titulo = metaParts.slice(1).join(' ');
-    const transportadora_titulo = rawTransportadora.replace(/\s+/g, '');
 
     // Tenta colunas de valor na mesma ordem do endpoint /columns
     const { rows: vcRows } = await pool.query<{ column_name: string }>(
