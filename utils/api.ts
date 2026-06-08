@@ -172,7 +172,7 @@ export const api = {
     request<{ sum: number | null }>(`/ferramentas/planilhas/column-sum?file=${encodeURIComponent(filename)}&column=${encodeURIComponent(column)}`),
 
   getPairedValueSum: (filename: string, cteColumn: string) =>
-    request<{ sum: number | null }>(`/ferramentas/planilhas/paired-value-sum?file=${encodeURIComponent(filename)}&cteColumn=${encodeURIComponent(cteColumn)}`),
+    request<{ sum: number | null; count: number }>(`/ferramentas/planilhas/paired-value-sum?file=${encodeURIComponent(filename)}&cteColumn=${encodeURIComponent(cteColumn)}`),
 
   detectSigla: (filename: string, cteColumn: string) =>
     request<{ sigla: string | null; transportadora: string | null }>(

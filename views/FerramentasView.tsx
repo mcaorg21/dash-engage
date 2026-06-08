@@ -378,7 +378,8 @@ const PlanilhasView = () => {
 
         // Valor Total
         upsertLog(filename, { key: 'valor', msg: 'Calculando Valor Total CTe\'s...', status: 'loading' });
-        api.getPairedValueSum(filename, autoMatch).then(({ sum }) => {
+        api.getPairedValueSum(filename, autoMatch).then(({ sum, count }) => {
+          upsertLog(filename, { key: 'ctes', msg: 'CTe\'s encontradas', value: String(count), status: count > 0 ? 'ok' : 'warn' });
           if (sum != null && sum > 0) {
             setDetectedCpSums(prev => ({ ...prev, [filename]: sum }));
             upsertLog(filename, { key: 'valor', msg: 'Valor Total CTe\'s', value: sum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), status: 'ok' });
