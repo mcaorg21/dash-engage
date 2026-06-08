@@ -241,6 +241,9 @@ const PlanilhasView = () => {
       const match = cols.find(c => savedSet.has(c));
       if (match) {
         setSelectedColumn(prev => ({ ...prev, [filename]: match }));
+        api.getPairedValueSum(filename, match).then(({ sum }) => {
+          if (sum != null) setDetectedCpSums(prev => ({ ...prev, [filename]: sum }));
+        }).catch(() => {});
         if (!editTransportadoras[filename]?.trim()) {
           api.detectSigla(filename, match).then(({ sigla }) => {
             if (sigla) setEditTransportadoras(prev => ({ ...prev, [filename]: sigla }));
@@ -342,6 +345,10 @@ const PlanilhasView = () => {
       const autoMatch = headers.find(c => savedSet.has(c));
       if (autoMatch) {
         setSelectedColumn(prev => ({ ...prev, [filename]: autoMatch }));
+        // Pré-calcula valor total pareado (igual ao que será enviado no POST)
+        api.getPairedValueSum(filename, autoMatch).then(({ sum }) => {
+          if (sum != null) setDetectedCpSums(prev => ({ ...prev, [filename]: sum }));
+        }).catch(() => {});
         // Detecta sigla automaticamente via n8n se ainda não preenchida
         if (!editTransportadoras[filename]?.trim()) {
           api.detectSigla(filename, autoMatch).then(({ sigla }) => {

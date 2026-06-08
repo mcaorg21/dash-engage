@@ -458,6 +458,26 @@ router.get('/planilhas/column-sum', async (req: AuthRequest, res) => {
   }
 });
 
+router.get('/planilhas/paired-value-sum', async (req: AuthRequest, res) => {
+  try {
+    const filename = String(req.query.file || '');
+    const cteColumn = String(req.query.cteColumn || '');
+    if (!filename || !cteColumn) { res.status(400).json({ error: 'file e cteColumn sao obrigatorios.' }); return; }
+    const [buffer] = await gcs.bucket(BUCKET_NAME).file(filename).download();
+    const { rows: vcRows } = await pool.query<{ column_name: string }>(
+      'SELECT column_name FROM saved_value_column_names ORDER BY column_name',
+    ).catch(() => ({ rows: [] }));
+    const savedValueCols = vcRows.map(r => r.column_name);
+    const valueColumns = ['BASE CALC', 'Frete', ...savedValueCols];
+    const ctes = parseSheetCteRows(buffer, cteColumn, valueColumns, 1);
+    const sum = ctes.reduce((s, c) => s + (c.valor ?? 0), 0);
+    res.json({ sum: ctes.length > 0 ? sum : null });
+  } catch (err) {
+    console.error('paired-value-sum error:', err);
+    res.json({ sum: null });
+  }
+});
+
 const SIGLA_WEBHOOK = 'https://primary-production-1a8e5.up.railway.app/webhook/ae94c030-88ab-4410-9478-599b56f27664-retorna-sigla';
 
 router.get('/planilhas/detect-sigla', async (req: AuthRequest, res) => {
