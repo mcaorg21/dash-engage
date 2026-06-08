@@ -132,7 +132,7 @@ function parseSheetCteRows(
       if (!Array.isArray(row)) continue;
       const chaveRaw = row[cteIdx];
       if (chaveRaw == null || chaveRaw === '') continue;
-      const chave = String(chaveRaw).trim();
+      const chave = String(chaveRaw).replace(/^'+/, '').trim();
 
       let valor: number | null = null;
       if (valIdx !== -1) {
@@ -512,7 +512,7 @@ router.get('/planilhas/detect-sigla', async (req: AuthRequest, res) => {
       const row = dataRows[i] as unknown[];
       if (!Array.isArray(row)) continue;
       const v = row[colIdx];
-      if (v != null && v !== '') { chaveCteSample = String(v); break; }
+      if (v != null && v !== '') { chaveCteSample = String(v).replace(/^'+/, '').trim(); break; }
     }
 
     if (!chaveCteSample) { res.json({ sigla: null }); return; }
