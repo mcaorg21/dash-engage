@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle2, ChevronDown, Copy, Download, FileSpreadsheet, Loader2, RefreshCw, Save, Search, Trash2, Upload, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, Copy, Download, FileSpreadsheet, Loader2, RefreshCw, Save, Search, Trash2, Upload, X } from 'lucide-react';
 import { api, type BucketFile } from '../utils/api';
 import { useModal } from '../components/useModal';
 import { TRANSPORTADORAS } from '../utils/transportadoras';
 
 const ACCEPTED = ['.xlsx', '.xls', '.csv', '.ods', '.xlsm', '.tsv'];
+type LogEntry = { key: string; msg: string; value?: string; status: 'loading' | 'ok' | 'warn' };
 const API_BASE = (import.meta.env.VITE_API_URL ?? '') + '/api';
 
 const formatBytes = (bytes: number) => {
@@ -154,8 +155,12 @@ const PlanilhasView = () => {
   const [loadingCpSum, setLoadingCpSum] = useState<Record<string, boolean>>({});
   const [savedValueColumns, setSavedValueColumns] = useState<string[]>([]);
   const [syncingFile, setSyncingFile] = useState<string | null>(null);
-  const [syncResults, setSyncResults] = useState<Record<string, { sent: number; valorTotal: number; status: number; sql?: string; retorno?: boolean } | null>>({});
+  const [syncResults, setSyncResults] = useState<Record<string, { sent: number; valorTotal: number; status: number; sql?: string; retorno?: boolean; valor_diferenca?: number; quantidade_diferenca?: number; ctes_nao_encontradas?: string } | null>>({});
   const [copiedSql, setCopiedSql] = useState<string | null>(null);
+
+  const [fileLog, setFileLog] = useState<Record<string, LogEntry[]>>({});
+  const [detalhesOpen, setDetalhesOpen] = useState<Record<string, boolean>>({});
+  const [editMode, setEditMode] = useState<Record<string, boolean>>({});
 
   // Global saved column names (DB)
   const [savedColumnNames, setSavedColumnNames] = useState<string[]>([]);
@@ -332,30 +337,81 @@ const PlanilhasView = () => {
     }
   };
 
+  const upsertLog = useCallback((filename: string, entry: LogEntry) => {
+    setFileLog(prev => {
+      const list = prev[filename] ?? [];
+      const idx = list.findIndex(e => e.key === entry.key);
+      if (idx === -1) return { ...prev, [filename]: [...list, entry] };
+      return { ...prev, [filename]: list.map((e, i) => i === idx ? { ...e, ...entry } : e) };
+    });
+  }, []);
+
   const fetchColumns = async (filename: string) => {
+    setFileLog(prev => ({ ...prev, [filename]: [] }));
     setLoadingColumns(prev => ({ ...prev, [filename]: true }));
+    upsertLog(filename, { key: 'planilha', msg: 'Lendo planilha...', status: 'loading' });
     try {
       const raw = await api.getPlanilhaColumns(filename);
       const headers = Array.isArray(raw) ? raw : raw.headers;
       const cvValue = Array.isArray(raw) ? null : raw.cvValue;
       const cpSum = Array.isArray(raw) ? null : raw.cpSum;
       setFileColumns(prev => ({ ...prev, [filename]: headers }));
+      upsertLog(filename, { key: 'planilha', msg: 'Planilha lida', value: `${headers.length} colunas`, status: 'ok' });
+
+      // Título
+      const tituloPrevio = editTransportadoraTextos[filename] ?? '';
+      const tituloOk = cvValue != null && cvValue !== 'NAO_ENCONTRADO';
+      const tituloFinal = tituloOk ? cvValue! : tituloPrevio;
+      if (tituloOk) {
+        upsertLog(filename, { key: 'titulo', msg: 'Título', value: cvValue!, status: 'ok' });
+      } else {
+        upsertLog(filename, { key: 'titulo', msg: 'Título não detectado automaticamente', status: 'warn' });
+        if (!tituloFinal.trim()) setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
+      }
+
       // Auto-select the first column that matches a saved name
       const savedSet = new Set(savedColumnNames);
       const autoMatch = headers.find(c => savedSet.has(c));
       if (autoMatch) {
         setSelectedColumn(prev => ({ ...prev, [filename]: autoMatch }));
-        // Pré-calcula valor total pareado (igual ao que será enviado no POST)
+        upsertLog(filename, { key: 'coluna', msg: 'Coluna CTe', value: autoMatch, status: 'ok' });
+
+        // Valor Total
+        upsertLog(filename, { key: 'valor', msg: 'Calculando Valor Total CTe\'s...', status: 'loading' });
         api.getPairedValueSum(filename, autoMatch).then(({ sum }) => {
-          if (sum != null && sum > 0) setDetectedCpSums(prev => ({ ...prev, [filename]: sum }));
-        }).catch(() => {});
-        // Detecta sigla automaticamente via n8n se ainda não preenchida
+          if (sum != null && sum > 0) {
+            setDetectedCpSums(prev => ({ ...prev, [filename]: sum }));
+            upsertLog(filename, { key: 'valor', msg: 'Valor Total CTe\'s', value: sum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), status: 'ok' });
+          } else {
+            upsertLog(filename, { key: 'valor', msg: 'Valor Total CTe\'s não calculado', status: 'warn' });
+          }
+        }).catch(() => {
+          upsertLog(filename, { key: 'valor', msg: 'Erro ao calcular Valor Total', status: 'warn' });
+        });
+
+        // Sigla
         if (!editTransportadoras[filename]?.trim()) {
+          upsertLog(filename, { key: 'sigla', msg: 'Procurando Sigla...', status: 'loading' });
           api.detectSigla(filename, autoMatch).then(({ sigla }) => {
-            if (sigla) setEditTransportadoras(prev => ({ ...prev, [filename]: sigla }));
-          }).catch(err => console.warn('detect-sigla:', err));
+            if (sigla) {
+              setEditTransportadoras(prev => ({ ...prev, [filename]: sigla }));
+              upsertLog(filename, { key: 'sigla', msg: 'Sigla', value: sigla, status: 'ok' });
+            } else {
+              upsertLog(filename, { key: 'sigla', msg: 'Sigla não detectada automaticamente', status: 'warn' });
+              setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
+            }
+          }).catch(() => {
+            upsertLog(filename, { key: 'sigla', msg: 'Erro ao detectar Sigla', status: 'warn' });
+            setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
+          });
+        } else {
+          upsertLog(filename, { key: 'sigla', msg: 'Sigla', value: editTransportadoras[filename], status: 'ok' });
         }
+      } else {
+        upsertLog(filename, { key: 'coluna', msg: 'Coluna CTe não detectada automaticamente', status: 'warn' });
+        setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
       }
+
       // Preenche Título com o primeiro valor da coluna NUMERO DA FATURA
       // Se NAO_ENCONTRADO, preserva o que já estava preenchido
       let resolvedTitulo = editTransportadoraTextos[filename] ?? '';
@@ -381,6 +437,7 @@ const PlanilhasView = () => {
         }
       }
     } catch (err: any) {
+      upsertLog(filename, { key: 'planilha', msg: 'Erro ao ler planilha', status: 'warn' });
       await alert(err.message || 'Erro ao ler colunas do arquivo.', 'Erro');
       setFileColumns(prev => ({ ...prev, [filename]: [] }));
     } finally {
@@ -390,16 +447,27 @@ const PlanilhasView = () => {
 
   const handleSincronizar = async (filename: string, cteColumn: string, sigla: string, titulo: string) => {
     setSyncingFile(filename);
+    upsertLog(filename, { key: 'conciliar', msg: 'Conciliando...', status: 'loading' });
     try {
       const result = await api.sincronizarPlanilha(filename, cteColumn, sigla, titulo);
       const rawBody = result.webhook.body as any;
       const body = Array.isArray(rawBody) ? rawBody[0] : rawBody;
       const retorno = body?.retorno === true;
       const sql = typeof body?.sql === 'string' ? body.sql : undefined;
-      setSyncResults(prev => ({ ...prev, [filename]: { sent: result.sent, valorTotal: result.valorTotal, status: result.webhook.status, retorno, sql } }));
-      // Atualiza o Valor Total CTe's com o valor real enviado no POST
-      setDetectedCpSums(prev => ({ ...prev, [filename]: result.valorTotal }));
+      const valor_diferenca = typeof body?.valor_diferenca === 'number' ? body.valor_diferenca : undefined;
+      const quantidade_diferenca = typeof body?.quantidade_diferenca === 'number' ? body.quantidade_diferenca : undefined;
+      const ctes_nao_encontradas = typeof body?.ctes_nao_encontradas === 'string' ? body.ctes_nao_encontradas : undefined;
+      setSyncResults(prev => ({ ...prev, [filename]: { sent: result.sent, valorTotal: result.valorTotal, status: result.webhook.status, retorno, sql, valor_diferenca, quantidade_diferenca, ctes_nao_encontradas } }));
+      upsertLog(filename, {
+        key: 'conciliar',
+        msg: retorno ? 'Conciliado com sucesso' : 'Conciliação não aprovada',
+        value: `${result.sent} CTe's · ${result.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+        status: retorno ? 'ok' : 'warn',
+      });
+      if (!retorno) setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
     } catch (err: any) {
+      upsertLog(filename, { key: 'conciliar', msg: 'Erro ao conciliar', status: 'warn' });
+      setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
       await alert(err.message || 'Erro ao sincronizar.', 'Erro');
     } finally {
       setSyncingFile(null);
@@ -597,159 +665,244 @@ const PlanilhasView = () => {
                             className="shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50">
                             {deletingFile === file.name ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                           </button>
+                          {/* Conciliar */}
+                          {syncResults[file.name] ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold ${syncResults[file.name]!.retorno ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                                {syncResults[file.name]!.retorno ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                                {syncResults[file.name]!.sent} CTe's
+                              </span>
+                              {syncResults[file.name]!.retorno && syncResults[file.name]!.sql && (
+                                <button type="button" onClick={() => handleCopySql(file.name, syncResults[file.name]!.sql!)}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-slate-700">
+                                  {copiedSql === file.name ? <CheckCircle2 size={11} /> : <Copy size={11} />}
+                                  {copiedSql === file.name ? 'Copiado!' : 'SQL'}
+                                </button>
+                              )}
+                              <button type="button" onClick={() => setSyncResults(prev => ({ ...prev, [file.name]: null }))}
+                                title="Reenviar" className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
+                                <RefreshCw size={13} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button type="button"
+                              onClick={() => handleSincronizar(file.name, colSelected, transpEdit, transpTitulo)}
+                              disabled={!colSelected || !transpEdit.trim() || !transpTitulo.trim() || syncingFile === file.name}
+                              title="Conciliar"
+                              className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-40">
+                              {syncingFile === file.name ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                              Conciliar
+                            </button>
+                          )}
                         </div>
                         <div className="flex shrink-0 items-center gap-3 text-xs text-slate-400">
                           <span>{formatBytes(file.size)}</span>
                           <span>{formatDate(file.updated)}</span>
+                          <button type="button"
+                            onClick={() => setDetalhesOpen(prev => ({ ...prev, [file.name]: !prev[file.name] }))}
+                            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-slate-100 hover:text-slate-600">
+                            <ChevronDown size={12} className={`transition-transform duration-200 ${detalhesOpen[file.name] ? 'rotate-180' : ''}`} />
+                            Detalhes
+                          </button>
                         </div>
                       </div>
 
-                      {/* Linha 2: controles com labels em cima */}
-                      <div className="flex flex-wrap items-end justify-end gap-x-3 gap-y-2">
+                      {/* Barra de loading inline */}
+                      {(isLoadingCols || (fileLog[file.name] ?? []).some(e => e.status === 'loading')) && (
+                        <div className="-mx-4 -mt-1 mb-1.5 h-[2px] animate-pulse bg-blue-400/60" />
+                      )}
 
-                        {/* Sigla */}
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-semibold text-slate-400">Sigla</span>
-                          <SearchableSelect
-                            value={transpEdit}
-                            onChange={v => setEditTransportadoras(prev => ({ ...prev, [file.name]: v }))}
-                            options={TRANSPORTADORAS}
-                            disabled={isTranspSaving}
-                            placeholder="Selecionar..."
-                          />
-                        </div>
+                      {/* Painel Detalhes */}
+                      {detalhesOpen[file.name] && (() => {
+                        const log = fileLog[file.name] ?? [];
+                        const doneCount = log.filter(e => e.status === 'ok' || e.status === 'warn').length;
+                        const progress = log.length > 0 ? Math.round(doneCount / log.length * 100) : 0;
+                        const isRunning = log.some(e => e.status === 'loading');
+                        const isEdit = editMode[file.name] ?? false;
+                        return (
+                          <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 space-y-2.5">
 
-                        {/* Título */}
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-semibold text-slate-400">Título</span>
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={transpTitulo}
-                              onChange={e => setEditTransportadoraTextos(prev => ({ ...prev, [file.name]: e.target.value }))}
-                              disabled={isTranspSaving}
-                              placeholder="Título"
-                              className="w-36 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none disabled:opacity-50"
-                            />
-                            <button type="button" onClick={() => handleSaveTransportadora(file)}
-                              disabled={isTranspSaving || !isTranspDirty} title="Salvar"
-                              className="inline-flex shrink-0 items-center rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40">
-                              {isTranspSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="mb-0.5 h-8 w-px shrink-0 self-end bg-slate-200" />
-
-                        {/* Coluna chave CTE */}
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-semibold text-slate-400">Coluna chave CTe</span>
-                          {cols === undefined ? (
-                            <button type="button" onClick={() => fetchColumns(file.name)} disabled={isLoadingCols}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50">
-                              {isLoadingCols ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
-                              Detectar
-                            </button>
-                          ) : cols.length === 0 ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-red-500">Sem colunas</span>
-                              <button type="button"
-                                onClick={() => setFileColumns(prev => { const n = { ...prev }; delete n[file.name]; return n; })}
-                                className="text-xs text-slate-400 underline hover:text-slate-600">
-                                Tentar novamente
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <SearchableSelect
-                                value={colSelected}
-                                onChange={v => setSelectedColumn(prev => ({ ...prev, [file.name]: v }))}
-                                options={cols}
-                                disabled={isColSaving}
-                                placeholder="Selecionar coluna..."
-                                width="w-44"
-                              />
-                              {isAlreadySaved && colSelected ? (
-                                <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700">
-                                  <CheckCircle2 size={13} /> Salva
-                                </span>
-                              ) : (
-                                <button type="button" onClick={() => handleSaveColumnName(file.name)}
-                                  disabled={isColSaving || !colSelected} title="Salvar nome da coluna"
-                                  className="inline-flex items-center gap-1 rounded-lg bg-[var(--engage-blue-400)]/10 px-2.5 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:opacity-40">
-                                  {isColSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                                  Salvar
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {cols !== undefined && (
-                          <>
-                            <div className="mb-0.5 h-8 w-px shrink-0 self-end bg-slate-200" />
-                            {/* Valor Total CTe's */}
-                            <div className="flex flex-col gap-1">
-                              <span className="text-xs font-semibold text-slate-400">Valor Total CTe's</span>
-                              {cpSumFmt ? (
-                                <span className="inline-flex items-center rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700">{cpSumFmt}</span>
-                              ) : (
-                                <div className="flex items-center gap-1">
-                                  <SearchableSelect
-                                    value={classifyingCp[file.name] ?? ''}
-                                    onChange={v => setClassifyingCp(prev => ({ ...prev, [file.name]: v }))}
-                                    options={cols ?? []}
-                                    placeholder="Classificar coluna..."
-                                    width="w-44"
+                            {/* Log de etapas */}
+                            {log.length > 0 && (
+                              <div>
+                                <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-500 ${isRunning ? 'bg-blue-400' : doneCount === log.length ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                                    style={{ width: `${isRunning ? Math.max(progress, 10) : progress}%` }}
                                   />
-                                  <button type="button"
-                                    onClick={() => handleClassifyCp(file.name)}
-                                    disabled={!classifyingCp[file.name] || loadingCpSum[file.name]}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-40">
-                                    {loadingCpSum[file.name] ? <Loader2 size={12} className="animate-spin" /> : 'Calcular'}
-                                  </button>
                                 </div>
-                              )}
-                            </div>
-
-                            <div className="mb-0.5 h-8 w-px shrink-0 self-end bg-slate-200" />
-
-                            {/* Conciliar */}
-                            <div className="flex flex-col gap-1">
-                              <span className="text-xs font-semibold text-slate-400">Conciliar</span>
-                              {syncResults[file.name] ? (
-                                <div className="flex items-center gap-2">
-                                  <span className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold ${syncResults[file.name]!.retorno ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                                    {syncResults[file.name]!.retorno ? <CheckCircle2 size={13} /> : null}
-                                    {syncResults[file.name]!.sent} CTe's · {syncResults[file.name]!.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                  </span>
-                                  {syncResults[file.name]!.retorno && syncResults[file.name]!.sql && (
-                                    <button type="button"
-                                      onClick={() => handleCopySql(file.name, syncResults[file.name]!.sql!)}
-                                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-700">
-                                      {copiedSql === file.name ? <CheckCircle2 size={12} /> : <Copy size={12} />}
-                                      {copiedSql === file.name ? 'Copiado!' : 'SQL'}
-                                    </button>
-                                  )}
-                                  <button type="button" onClick={() => setSyncResults(prev => ({ ...prev, [file.name]: null }))}
-                                    title="Reenviar" className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
-                                    <RefreshCw size={13} />
-                                  </button>
+                                <div className="space-y-1">
+                                  {log.map((entry, i) => (
+                                    <div key={i} className="flex items-center gap-2 text-xs">
+                                      {entry.status === 'loading' ? <Loader2 size={11} className="shrink-0 animate-spin text-blue-500" />
+                                        : entry.status === 'ok' ? <CheckCircle2 size={11} className="shrink-0 text-emerald-500" />
+                                        : <AlertCircle size={11} className="shrink-0 text-amber-500" />}
+                                      <span className="text-slate-500">{entry.msg}</span>
+                                      {entry.value && <span className="font-semibold text-slate-700">{entry.value}</span>}
+                                    </div>
+                                  ))}
                                 </div>
-                              ) : (
+                              </div>
+                            )}
+
+                            {log.length > 0 && <div className="border-t border-slate-200" />}
+
+                            {/* Campos */}
+                            {cols === undefined ? (
+                              <button type="button" onClick={() => fetchColumns(file.name)} disabled={isLoadingCols}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50">
+                                {isLoadingCols ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
+                                Detectar colunas
+                              </button>
+                            ) : cols.length === 0 ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-red-500">Sem colunas detectadas</span>
                                 <button type="button"
-                                  onClick={() => handleSincronizar(file.name, colSelected, transpEdit, transpTitulo)}
-                                  disabled={!colSelected || !transpEdit.trim() || !transpTitulo.trim() || syncingFile === file.name}
-                                  title="Conciliar"
-                                  className="inline-flex items-center justify-center rounded-lg bg-violet-50 p-2 text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-40">
-                                  {syncingFile === file.name ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                                  onClick={() => setFileColumns(prev => { const n = { ...prev }; delete n[file.name]; return n; })}
+                                  className="text-xs text-slate-400 underline hover:text-slate-600">Tentar novamente</button>
+                              </div>
+                            ) : isEdit ? (
+                              /* Modo edição */
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+                                  {/* Sigla */}
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-semibold text-slate-400">Sigla</span>
+                                    <SearchableSelect
+                                      value={transpEdit}
+                                      onChange={v => setEditTransportadoras(prev => ({ ...prev, [file.name]: v }))}
+                                      options={TRANSPORTADORAS}
+                                      disabled={isTranspSaving}
+                                      placeholder="Selecionar..."
+                                    />
+                                  </div>
+                                  {/* Título */}
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-semibold text-slate-400">Título</span>
+                                    <div className="flex items-center gap-1">
+                                      <input type="text" value={transpTitulo}
+                                        onChange={e => setEditTransportadoraTextos(prev => ({ ...prev, [file.name]: e.target.value }))}
+                                        disabled={isTranspSaving} placeholder="Título"
+                                        className="w-36 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none disabled:opacity-50"
+                                      />
+                                      <button type="button" onClick={() => handleSaveTransportadora(file)}
+                                        disabled={isTranspSaving || !isTranspDirty}
+                                        className="inline-flex shrink-0 items-center rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40">
+                                        {isTranspSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className="mb-0.5 h-8 w-px shrink-0 self-end bg-slate-200" />
+                                  {/* Coluna CTe */}
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-semibold text-slate-400">Coluna chave CTe</span>
+                                    <div className="flex items-center gap-1">
+                                      <SearchableSelect
+                                        value={colSelected}
+                                        onChange={v => setSelectedColumn(prev => ({ ...prev, [file.name]: v }))}
+                                        options={cols}
+                                        disabled={isColSaving}
+                                        placeholder="Selecionar coluna..."
+                                        width="w-44"
+                                      />
+                                      {isAlreadySaved && colSelected ? (
+                                        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700">
+                                          <CheckCircle2 size={13} /> Salva
+                                        </span>
+                                      ) : (
+                                        <button type="button" onClick={() => handleSaveColumnName(file.name)}
+                                          disabled={isColSaving || !colSelected}
+                                          className="inline-flex items-center gap-1 rounded-lg bg-[var(--engage-blue-400)]/10 px-2.5 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:opacity-40">
+                                          {isColSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                                          Salvar
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="mb-0.5 h-8 w-px shrink-0 self-end bg-slate-200" />
+                                  {/* Valor Total */}
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-semibold text-slate-400">Valor Total CTe's</span>
+                                    {cpSumFmt ? (
+                                      <span className="inline-flex items-center rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700">{cpSumFmt}</span>
+                                    ) : (
+                                      <div className="flex items-center gap-1">
+                                        <SearchableSelect
+                                          value={classifyingCp[file.name] ?? ''}
+                                          onChange={v => setClassifyingCp(prev => ({ ...prev, [file.name]: v }))}
+                                          options={cols}
+                                          placeholder="Classificar coluna..."
+                                          width="w-44"
+                                        />
+                                        <button type="button" onClick={() => handleClassifyCp(file.name)}
+                                          disabled={!classifyingCp[file.name] || loadingCpSum[file.name]}
+                                          className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-40">
+                                          {loadingCpSum[file.name] ? <Loader2 size={12} className="animate-spin" /> : 'Calcular'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <button type="button"
+                                  onClick={() => setEditMode(prev => ({ ...prev, [file.name]: false }))}
+                                  className="text-xs text-slate-400 underline hover:text-slate-600">
+                                  Fechar edição
                                 </button>
-                              )}
-                            </div>
-                          </>
-                        )}
-
-                      </div>
+                              </div>
+                            ) : (
+                              /* Modo leitura */
+                              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+                                  {transpEdit && (
+                                    <span className="flex items-center gap-1.5">
+                                      <span className="text-slate-400">Sigla</span>
+                                      <span className="font-semibold text-slate-700">{transpEdit}</span>
+                                    </span>
+                                  )}
+                                  {transpTitulo && (
+                                    <span className="flex items-center gap-1.5">
+                                      <span className="text-slate-400">Título</span>
+                                      <span className="font-semibold text-slate-700">{transpTitulo}</span>
+                                    </span>
+                                  )}
+                                  {colSelected && (
+                                    <span className="flex items-center gap-1.5">
+                                      <span className="text-slate-400">Coluna CTe</span>
+                                      <span className="font-semibold text-slate-700">{colSelected}</span>
+                                    </span>
+                                  )}
+                                  {cpSumFmt && (
+                                    <span className="flex items-center gap-1.5">
+                                      <span className="text-slate-400">Valor Total</span>
+                                      <span className="font-semibold text-blue-700">{cpSumFmt}</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <button type="button"
+                                  onClick={() => setEditMode(prev => ({ ...prev, [file.name]: true }))}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-50">
+                                  Editar
+                                </button>
+                                {/* Motivo (quando conciliação falhou) */}
+                                {syncResults[file.name] && !syncResults[file.name]!.retorno && (syncResults[file.name]!.valor_diferenca != null || syncResults[file.name]!.quantidade_diferenca != null || syncResults[file.name]!.ctes_nao_encontradas) && (
+                                  <div className="rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs text-red-700 space-y-0.5">
+                                    <p className="font-semibold">Motivo</p>
+                                    {syncResults[file.name]!.valor_diferenca != null && (
+                                      <p>Diferença valor: {syncResults[file.name]!.valor_diferenca!.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                    )}
+                                    {syncResults[file.name]!.quantidade_diferenca != null && (
+                                      <p>Diferença qtd: {syncResults[file.name]!.quantidade_diferenca}</p>
+                                    )}
+                                    {syncResults[file.name]!.ctes_nao_encontradas && (
+                                      <p>CTe's não encontradas: {syncResults[file.name]!.ctes_nao_encontradas}</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}

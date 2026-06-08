@@ -125,10 +125,14 @@ function parseSheetCteRows(
       if (idx !== -1) { valIdx = idx; break; }
     }
 
+    // rawRows com raw: true para ler valores numéricos reais (evita perda de precisão com strings formatadas)
+    const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: true });
     const dataRows = allRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
+    const rawDataRows = rawRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
     const pairs: { chave: string; valor: number | null }[] = [];
 
-    for (const row of dataRows) {
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
       if (!Array.isArray(row)) continue;
       const chaveRaw = row[cteIdx];
       if (chaveRaw == null || chaveRaw === '') continue;
@@ -136,7 +140,8 @@ function parseSheetCteRows(
 
       let valor: number | null = null;
       if (valIdx !== -1) {
-        const v = row[valIdx];
+        const rawRow = rawDataRows[i];
+        const v = Array.isArray(rawRow) ? rawRow[valIdx] : undefined;
         if (v != null && v !== '') {
           const num = typeof v === 'number' ? v : parseFloat(String(v).replace(/\./g, '').replace(',', '.'));
           if (!isNaN(num)) valor = num;
@@ -413,9 +418,10 @@ router.get('/planilhas/columns', async (req: AuthRequest, res) => {
     }
     const [buffer] = await gcs.bucket(BUCKET_NAME).file(filename).download();
     const headers = parseSheetHeaders(buffer);
+    const faturaPartial = parseSheetFirstValue(buffer, 'fatura', true);
     const cvValue = parseSheetFirstValue(buffer, 'NUMERO DA FATURA')
-      ?? parseSheetFirstValue(buffer, 'fatura', true)
-      ?? parseSheetCell(buffer, 'E3')
+      ?? (faturaPartial && /\d/.test(faturaPartial) ? faturaPartial : null)
+      ?? parseSheetCell(buffer, 'D3')
       ?? 'NAO_ENCONTRADO';
 
     // Tenta colunas padrão, depois as salvas no dicionário
@@ -554,7 +560,7 @@ router.post('/planilhas/sincronizar', async (req: AuthRequest, res) => {
     const ctes = parseSheetCteRows(buffer, cteColumn, valueColumns, valueColumns.includes('Frete') ? 1 : 0);
     const valorTotal = ctes.reduce((sum, c) => sum + (c.valor ?? 0), 0);
 
-    const chaves_cte = ctes.map(c => `'${c.chave}'`).join(',');
+    const chaves_cte = ctes.map(c => `'${c.chave.replace("'", "")}'`).join(',');
     const total_ctes = ctes.length;
     const payload = { sigla, titulo, transportadora_titulo, arquivo: filename, valorTotal, total_ctes, chaves_cte, ctes };
 
