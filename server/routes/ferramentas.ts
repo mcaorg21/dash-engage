@@ -471,7 +471,7 @@ router.get('/planilhas/paired-value-sum', async (req: AuthRequest, res) => {
     const valueColumns = ['BASE CALC', 'Frete', ...savedValueCols];
     const ctes = parseSheetCteRows(buffer, cteColumn, valueColumns, 1);
     const sum = ctes.reduce((s, c) => s + (c.valor ?? 0), 0);
-    res.json({ sum: ctes.length > 0 ? sum : null });
+    res.json({ sum: ctes.length > 0 && sum > 0 ? sum : null });
   } catch (err) {
     console.error('paired-value-sum error:', err);
     res.json({ sum: null });
