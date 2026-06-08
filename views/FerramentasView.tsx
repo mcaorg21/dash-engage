@@ -390,6 +390,8 @@ const PlanilhasView = () => {
       const retorno = body?.retorno === true;
       const sql = typeof body?.sql === 'string' ? body.sql : undefined;
       setSyncResults(prev => ({ ...prev, [filename]: { sent: result.sent, valorTotal: result.valorTotal, status: result.webhook.status, retorno, sql } }));
+      // Atualiza o Valor Total CTe's com o valor real enviado no POST
+      setDetectedCpSums(prev => ({ ...prev, [filename]: result.valorTotal }));
     } catch (err: any) {
       await alert(err.message || 'Erro ao sincronizar.', 'Erro');
     } finally {
