@@ -125,11 +125,32 @@ function parseSheetCteRows(
       if (idx !== -1) { valIdx = idx; break; }
     }
 
-    // rawRows com raw: true para ler valores numéricos reais (evita perda de precisão com strings formatadas)
-    const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: true });
+    // Leitura separada sem cellText para valores numéricos — evita interferência do .w na leitura raw
+    const rawWorkbook = XLSX.read(buffer, { type: 'buffer' });
+    const rawSheet = rawWorkbook.Sheets[sheetName];
+    const rawRows = XLSX.utils.sheet_to_json<unknown[]>(rawSheet, { header: 1, defval: null, raw: true });
     const dataRows = allRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
     const rawDataRows = rawRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
     const pairs: { chave: string; valor: number | null }[] = [];
+
+    const parseNumeric = (v: unknown): number | null => {
+      if (typeof v === 'number') return v;
+      if (v == null || v === '') return null;
+      const s = String(v).trim();
+      const lastDot = s.lastIndexOf('.');
+      const lastComma = s.lastIndexOf(',');
+      let num: number;
+      if (lastComma > lastDot) {
+        // Formato BR: 1.023,58 — vírgula é separador decimal
+        num = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+      } else if (lastDot > lastComma) {
+        // Formato US: 1,023.58 — ponto é separador decimal
+        num = parseFloat(s.replace(/,/g, ''));
+      } else {
+        num = parseFloat(s);
+      }
+      return isNaN(num) ? null : num;
+    };
 
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
@@ -142,10 +163,7 @@ function parseSheetCteRows(
       if (valIdx !== -1) {
         const rawRow = rawDataRows[i];
         const v = Array.isArray(rawRow) ? rawRow[valIdx] : undefined;
-        if (v != null && v !== '') {
-          const num = typeof v === 'number' ? v : parseFloat(String(v).replace(/\./g, '').replace(',', '.'));
-          if (!isNaN(num)) valor = num;
-        }
+        valor = parseNumeric(v);
       }
       pairs.push({ chave, valor });
     }
