@@ -329,13 +329,20 @@ router.get('/planilhas', async (_req: AuthRequest, res) => {
   try {
     const [files] = await gcs.bucket(BUCKET_NAME).getFiles();
     res.json(
-      files.map(f => ({
-        name: f.name,
-        size: Number(f.metadata.size || 0),
-        updated: f.metadata.updated ?? null,
-        contentType: f.metadata.contentType ?? null,
-        transportadora: (f.metadata as any).metadata?.transportadora ?? null,
-      })),
+      files.map(f => {
+        const meta = (f.metadata as any).metadata ?? {};
+        return {
+          name: f.name,
+          size: Number(f.metadata.size || 0),
+          updated: f.metadata.updated ?? null,
+          contentType: f.metadata.contentType ?? null,
+          transportadora: meta.transportadora ?? null,
+          sigla: meta.sigla ?? null,
+          titulo: meta.titulo ?? null,
+          coluna_cte: meta.coluna_cte ?? null,
+          valor_total: meta.valor_total ? Number(meta.valor_total) : null,
+        };
+      }),
     );
   } catch (err) {
     console.error('GCS list error:', err);
@@ -397,6 +404,10 @@ router.post('/planilhas/metadata', async (req: AuthRequest, res) => {
     }
     const updates: Record<string, string> = {};
     if (req.body.transportadora !== undefined) updates.transportadora = String(req.body.transportadora);
+    if (req.body.sigla !== undefined) updates.sigla = String(req.body.sigla);
+    if (req.body.titulo !== undefined) updates.titulo = String(req.body.titulo);
+    if (req.body.coluna_cte !== undefined) updates.coluna_cte = String(req.body.coluna_cte);
+    if (req.body.valor_total !== undefined) updates.valor_total = String(req.body.valor_total);
     if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: 'Nenhum campo para atualizar.' });
       return;

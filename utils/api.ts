@@ -43,6 +43,10 @@ export interface BucketFile {
   updated: string | null;
   contentType: string | null;
   transportadora: string | null;
+  sigla: string | null;
+  titulo: string | null;
+  coluna_cte: string | null;
+  valor_total: number | null;
 }
 
 export interface ExtractRow {
@@ -159,7 +163,7 @@ export const api = {
       body: JSON.stringify({ file: filename }),
     }),
 
-  updatePlanilhaMetadata: (filename: string, fields: { transportadora?: string }) =>
+  updatePlanilhaMetadata: (filename: string, fields: { transportadora?: string; sigla?: string; titulo?: string; coluna_cte?: string; valor_total?: number }) =>
     request<{ updated: string }>('/ferramentas/planilhas/metadata', {
       method: 'POST',
       body: JSON.stringify({ file: filename, ...fields }),

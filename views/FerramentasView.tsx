@@ -209,13 +209,25 @@ const PlanilhasView = () => {
       const sorted = data.sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''));
       setBucketFiles(sorted);
       setEditTransportadoras(Object.fromEntries(sorted.map(f => {
+        if (f.sigla) return [f.name, f.sigla];
         const parts = (f.transportadora ?? '').split(' ');
         return [f.name, parts[0] ?? ''];
       })));
       setEditTransportadoraTextos(Object.fromEntries(sorted.map(f => {
+        if (f.titulo) return [f.name, f.titulo];
         const parts = (f.transportadora ?? '').split(' ');
         return [f.name, parts.slice(1).join(' ')];
       })));
+      setSelectedColumn(prev => {
+        const patch: Record<string, string> = {};
+        sorted.forEach(f => { if (f.coluna_cte && !prev[f.name]) patch[f.name] = f.coluna_cte; });
+        return { ...prev, ...patch };
+      });
+      setDetectedCpSums(prev => {
+        const patch: Record<string, number | null> = {};
+        sorted.forEach(f => { if (f.valor_total != null && !prev[f.name]) patch[f.name] = f.valor_total; });
+        return { ...prev, ...patch };
+      });
     } catch (err: any) {
       setListError(err.message || 'Erro ao listar arquivos.');
     } finally {
@@ -232,7 +244,21 @@ const PlanilhasView = () => {
   // Auto-detecta colunas assim que os arquivos são carregados
   useEffect(() => {
     if (bucketFiles.length > 0) {
-      bucketFiles.forEach(f => fetchColumns(f.name));
+      bucketFiles.forEach(f => {
+        if (f.coluna_cte && f.sigla && f.titulo) {
+          // Dados completos em cache — registra log e dispara sync direto
+          setFileLog(prev => ({ ...prev, [f.name]: [
+            { key: 'planilha', msg: 'Dados em cache', status: 'ok' },
+            { key: 'titulo',   msg: 'Título',          value: f.titulo!,       status: 'ok' },
+            { key: 'coluna',   msg: 'Coluna CTe',      value: f.coluna_cte!,   status: 'ok' },
+            { key: 'sigla',    msg: 'Sigla',            value: f.sigla!,        status: 'ok' },
+            ...(f.valor_total != null ? [{ key: 'valor', msg: "Valor Total CTe's", value: f.valor_total!.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), status: 'ok' as const }] : []),
+          ]}));
+          handleSincronizar(f.name, f.coluna_cte, f.sigla, f.titulo);
+        } else {
+          fetchColumns(f.name);
+        }
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bucketFiles.length]);
@@ -469,7 +495,20 @@ const PlanilhasView = () => {
         status: retorno ? 'ok' : 'warn',
       });
       setActiveTab(retorno ? 'sucesso' : 'erro');
-      if (!retorno) setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
+      if (retorno) {
+        api.updatePlanilhaMetadata(filename, {
+          transportadora: `${sigla} ${titulo}`.trim(),
+          sigla,
+          titulo,
+          coluna_cte: cteColumn,
+          valor_total: result.valorTotal,
+        }).catch(() => {});
+        setBucketFiles(prev => prev.map(f => f.name === filename
+          ? { ...f, sigla, titulo, coluna_cte: cteColumn, valor_total: result.valorTotal }
+          : f));
+      } else {
+        setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
+      }
     } catch (err: any) {
       upsertLog(filename, { key: 'conciliar', msg: 'Erro ao conciliar', status: 'warn' });
       setActiveTab('erro');
