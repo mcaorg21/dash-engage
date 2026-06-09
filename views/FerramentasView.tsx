@@ -161,6 +161,7 @@ const PlanilhasView = () => {
   const [fileLog, setFileLog] = useState<Record<string, LogEntry[]>>({});
   const [detalhesOpen, setDetalhesOpen] = useState<Record<string, boolean>>({});
   const [editMode, setEditMode] = useState<Record<string, boolean>>({});
+  const [activeTab, setActiveTab] = useState<'pendente' | 'sucesso' | 'erro'>('pendente');
 
   // Global saved column names (DB)
   const [savedColumnNames, setSavedColumnNames] = useState<string[]>([]);
@@ -397,6 +398,7 @@ const PlanilhasView = () => {
             if (sigla) {
               setEditTransportadoras(prev => ({ ...prev, [filename]: sigla }));
               upsertLog(filename, { key: 'sigla', msg: 'Sigla', value: sigla, status: 'ok' });
+              if (tituloFinal.trim()) handleSincronizar(filename, autoMatch, sigla, tituloFinal);
             } else {
               upsertLog(filename, { key: 'sigla', msg: 'Sigla não detectada automaticamente', status: 'warn' });
               setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
@@ -407,6 +409,7 @@ const PlanilhasView = () => {
           });
         } else {
           upsertLog(filename, { key: 'sigla', msg: 'Sigla', value: editTransportadoras[filename], status: 'ok' });
+          if (tituloFinal.trim()) handleSincronizar(filename, autoMatch, editTransportadoras[filename], tituloFinal);
         }
       } else {
         upsertLog(filename, { key: 'coluna', msg: 'Coluna CTe não detectada automaticamente', status: 'warn' });
@@ -465,9 +468,11 @@ const PlanilhasView = () => {
         value: `${result.sent} CTe's · ${result.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
         status: retorno ? 'ok' : 'warn',
       });
+      setActiveTab(retorno ? 'sucesso' : 'erro');
       if (!retorno) setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
     } catch (err: any) {
       upsertLog(filename, { key: 'conciliar', msg: 'Erro ao conciliar', status: 'warn' });
+      setActiveTab('erro');
       setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
       await alert(err.message || 'Erro ao sincronizar.', 'Erro');
     } finally {
@@ -632,9 +637,26 @@ const PlanilhasView = () => {
           <div className="p-8 text-sm font-medium text-slate-500">Nenhum arquivo no repositorio.</div>
         )}
 
-        {!isLoadingFiles && !listError && bucketFiles.length > 0 && (
+        {!isLoadingFiles && !listError && bucketFiles.length > 0 && (() => {
+          const pendentes = bucketFiles.filter(f => !syncResults[f.name]);
+          const sucessos  = bucketFiles.filter(f => syncResults[f.name]?.retorno === true);
+          const erros     = bucketFiles.filter(f => syncResults[f.name]?.retorno === false);
+          const filesToShow = activeTab === 'sucesso' ? sucessos : activeTab === 'erro' ? erros : pendentes;
+          return (
+          <>
+          {/* Abas */}
+          <div className="flex items-center gap-0 border-b border-slate-100 px-4">
+            {([['pendente', 'Pendente', pendentes.length], ['sucesso', 'Sucesso', sucessos.length], ['erro', 'Erro', erros.length]] as const).map(([key, label, count]) => (
+              <button key={key} type="button" onClick={() => setActiveTab(key)}
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-semibold transition-colors ${activeTab === key ? 'border-violet-500 text-violet-700' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                {label}
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${activeTab === key ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+              </button>
+            ))}
+          </div>
+
           <div className="divide-y divide-slate-100">
-            {bucketFiles.map(file => {
+            {filesToShow.map(file => {
                   const transpEdit = editTransportadoras[file.name] ?? '';
                   const transpTitulo = editTransportadoraTextos[file.name] ?? '';
                   const transpMerged = transpTitulo.trim() ? `${transpEdit} ${transpTitulo.trim()}` : transpEdit;
@@ -908,7 +930,12 @@ const PlanilhasView = () => {
                   );
                 })}
           </div>
-        )}
+          {filesToShow.length === 0 && (
+            <div className="p-8 text-center text-sm text-slate-400">Nenhum arquivo nesta aba.</div>
+          )}
+          </>
+          );
+        })()}
       </div>
 
       {/* Saved column names */}
