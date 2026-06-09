@@ -152,6 +152,20 @@ function parseSheetCteRows(
       return isNaN(num) ? null : num;
     };
 
+    // DEBUG: loga primeiros valores brutos da coluna de valor
+    if (valIdx !== -1) {
+      const sample = rawDataRows.slice(0, 5).map(r => {
+        const v = Array.isArray(r) ? r[valIdx] : undefined;
+        return { type: typeof v, value: v };
+      });
+      console.log('[parseSheetCteRows] raw value sample:', JSON.stringify(sample));
+      const fmtSample = dataRows.slice(0, 5).map(r => {
+        const v = Array.isArray(r) ? (r as unknown[])[valIdx] : undefined;
+        return { type: typeof v, value: v };
+      });
+      console.log('[parseSheetCteRows] fmt value sample (raw:false):', JSON.stringify(fmtSample));
+    }
+
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
       if (!Array.isArray(row)) continue;
