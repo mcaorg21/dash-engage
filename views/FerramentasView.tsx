@@ -286,39 +286,40 @@ const PlanilhasView = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedColumnNames]);
 
-  const addFiles = (incoming: FileList | File[]) => {
-    const arr = Array.from(incoming).filter(f =>
-      ACCEPTED.some(ext => f.name.toLowerCase().endsWith(ext)),
-    );
-    setPendingFiles(prev => {
-      const names = new Set(prev.map(f => f.name));
-      return [...prev, ...arr.filter(f => !names.has(f.name))];
-    });
-    setUploadError(null);
-    setUploadSuccess(null);
-  };
-
-  const removeFile = (name: string) => setPendingFiles(prev => prev.filter(f => f.name !== name));
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = () => setIsDragging(false);
   const handleDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); addFiles(e.dataTransfer.files); };
 
-  const handleUpload = async () => {
-    if (pendingFiles.length === 0) return;
+  const uploadFiles = async (files: File[]) => {
+    if (files.length === 0) return;
     setIsUploading(true);
     setUploadError(null);
     setUploadSuccess(null);
     try {
-      const result = await api.uploadPlanilhas(pendingFiles);
+      const result = await api.uploadPlanilhas(files);
       setUploadSuccess(result.uploaded);
       setPendingFiles([]);
       await loadFiles();
       result.uploaded.forEach(filename => fetchColumns(filename));
     } catch (err: any) {
       setUploadError(err.message || 'Erro ao fazer upload.');
+      setPendingFiles([]);
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const addFiles = (incoming: FileList | File[]) => {
+    const arr = Array.from(incoming).filter(f =>
+      ACCEPTED.some(ext => f.name.toLowerCase().endsWith(ext)),
+    );
+    if (arr.length === 0) return;
+    const deduped = arr.filter(f => !pendingFiles.some(p => p.name === f.name));
+    if (deduped.length === 0) return;
+    setPendingFiles(prev => [...prev, ...deduped]);
+    setUploadError(null);
+    setUploadSuccess(null);
+    uploadFiles(deduped);
   };
 
   const handleDelete = async (file: BucketFile) => {
@@ -586,67 +587,35 @@ const PlanilhasView = () => {
       </div>
 
       {/* Upload */}
-      <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-base font-bold text-slate-800">Enviar arquivos</h2>
+      <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 shadow-sm space-y-2">
         <div
-          className={`relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-12 transition-colors cursor-pointer ${
-            isDragging
-              ? 'border-[var(--engage-blue-500)] bg-[var(--engage-blue-400)]/5'
-              : 'border-slate-200 hover:border-[var(--engage-blue-400)] hover:bg-slate-50'
+          className={`flex items-center gap-3 rounded-lg border border-dashed px-4 py-2.5 transition-colors cursor-pointer ${
+            isUploading ? 'border-[var(--engage-blue-300)] bg-[var(--engage-blue-400)]/5 cursor-default' :
+            isDragging ? 'border-[var(--engage-blue-500)] bg-[var(--engage-blue-400)]/5' :
+            'border-slate-200 hover:border-[var(--engage-blue-400)] hover:bg-slate-50'
           }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => !isUploading && inputRef.current?.click()}
         >
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--engage-blue-400)]/10">
-            <Upload size={26} className="text-[var(--engage-blue-700)]" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-semibold text-slate-700">
-              Arraste arquivos aqui ou <span className="text-[var(--engage-blue-600)]">clique para selecionar</span>
-            </p>
-            <p className="mt-1 text-xs text-slate-400">{ACCEPTED.join(', ')} — varios arquivos simultaneos</p>
-          </div>
+          {isUploading
+            ? <Loader2 size={15} className="shrink-0 animate-spin text-[var(--engage-blue-600)]" />
+            : <Upload size={15} className="shrink-0 text-[var(--engage-blue-600)]" />
+          }
+          <span className="text-sm text-slate-600 flex-1">
+            {isUploading
+              ? <span className="font-medium text-[var(--engage-blue-700)]">Enviando {pendingFiles.length} arquivo{pendingFiles.length !== 1 ? 's' : ''}...</span>
+              : <><span className="font-medium text-[var(--engage-blue-600)]">Clique ou arraste</span> para adicionar planilhas</>
+            }
+          </span>
+          <span className="text-xs text-slate-400">{ACCEPTED.join(', ')}</span>
           <input ref={inputRef} type="file" multiple accept={ACCEPTED.join(',')} className="hidden"
-            onChange={e => e.target.files && addFiles(e.target.files)} />
+            onChange={e => { if (e.target.files) { addFiles(e.target.files); e.target.value = ''; } }} />
         </div>
-
-        {pendingFiles.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-              {pendingFiles.length} arquivo{pendingFiles.length !== 1 ? 's' : ''} selecionado{pendingFiles.length !== 1 ? 's' : ''}
-            </p>
-            <ul className="divide-y divide-slate-50 rounded-lg border border-slate-100">
-              {pendingFiles.map(f => (
-                <li key={f.name} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <FileSpreadsheet size={16} className="shrink-0 text-emerald-500" />
-                    <span className="truncate text-sm font-medium text-slate-700">{f.name}</span>
-                    <span className="shrink-0 text-xs text-slate-400">{formatBytes(f.size)}</span>
-                  </div>
-                  <button type="button" onClick={e => { e.stopPropagation(); removeFile(f.name); }}
-                    className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-                    <X size={14} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="flex items-center gap-3 pt-1">
-              <button type="button" onClick={handleUpload} disabled={isUploading}
-                className="inline-flex items-center gap-2 rounded-lg bg-[var(--engage-blue-600)] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)] disabled:opacity-60">
-                {isUploading ? <><Loader2 size={15} className="animate-spin" /> Enviando...</> : <><Upload size={15} /> Enviar {pendingFiles.length} arquivo{pendingFiles.length !== 1 ? 's' : ''}</>}
-              </button>
-              <button type="button" onClick={() => setPendingFiles([])} disabled={isUploading}
-                className="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-60">
-                Limpar
-              </button>
-            </div>
-          </div>
-        )}
-        {uploadError && <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{uploadError}</div>}
+        {uploadError && <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-red-600">{uploadError}</div>}
         {uploadSuccess && (
-          <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
             {uploadSuccess.length} arquivo{uploadSuccess.length !== 1 ? 's' : ''} enviado{uploadSuccess.length !== 1 ? 's' : ''} com sucesso.
           </div>
         )}
