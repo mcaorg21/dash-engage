@@ -445,7 +445,7 @@ const PlanilhasView = () => {
             if (sigla) {
               setEditTransportadoras(prev => ({ ...prev, [filename]: sigla }));
               upsertLog(filename, { key: 'sigla', msg: 'Sigla', value: sigla, status: 'ok' });
-              if (tituloFinal.trim()) handleSincronizar(filename, autoMatch, sigla, tituloFinal);
+              if (tituloFinal.trim() && tituloFinal !== 'NAO_ENCONTRADO') handleSincronizar(filename, autoMatch, sigla, tituloFinal);
             } else {
               upsertLog(filename, { key: 'sigla', msg: 'Sigla não detectada automaticamente', status: 'warn' });
               setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
@@ -456,7 +456,7 @@ const PlanilhasView = () => {
           });
         } else {
           upsertLog(filename, { key: 'sigla', msg: 'Sigla', value: editTransportadoras[filename], status: 'ok' });
-          if (tituloFinal.trim()) handleSincronizar(filename, autoMatch, editTransportadoras[filename], tituloFinal);
+          if (tituloFinal.trim() && tituloFinal !== 'NAO_ENCONTRADO') handleSincronizar(filename, autoMatch, editTransportadoras[filename], tituloFinal);
         }
       } else {
         upsertLog(filename, { key: 'coluna', msg: 'Coluna CTe não detectada automaticamente', status: 'warn' });
@@ -467,7 +467,9 @@ const PlanilhasView = () => {
       // Se NAO_ENCONTRADO, preserva o que já estava preenchido
       let resolvedTitulo = editTransportadoraTextos[filename] ?? '';
       if (cvValue != null) {
-        if (cvValue !== 'NAO_ENCONTRADO' || !resolvedTitulo.trim()) {
+        if (cvValue === 'NAO_ENCONTRADO') {
+          // Não sobrescreve com NAO_ENCONTRADO — mantém o que estava ou deixa vazio
+        } else {
           resolvedTitulo = cvValue;
         }
         setEditTransportadoraTextos(prev => ({ ...prev, [filename]: resolvedTitulo }));
@@ -735,6 +737,9 @@ const PlanilhasView = () => {
                     ? cpSum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                     : null;
 
+                  const log = fileLog[file.name] ?? [];
+                  const tituloWarn = (!transpTitulo.trim() || transpTitulo === 'NAO_ENCONTRADO') && log.some(e => e.key === 'titulo' && e.status === 'warn');
+
                   return (
                     <div key={file.name} className="px-4 py-3 transition-colors hover:bg-slate-50/60">
                       {/* Linha 1: nome + ações + meta */}
@@ -745,6 +750,12 @@ const PlanilhasView = () => {
                           }} className="h-3.5 w-3.5 shrink-0 rounded accent-violet-600 cursor-pointer" />
                           <FileSpreadsheet size={15} className="shrink-0 text-emerald-500" />
                           <span className="truncate text-sm font-medium text-slate-700" title={file.name}>{file.name}</span>
+                          {tituloWarn && (
+                            <span className="animate-pulse shrink-0 inline-flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600">
+                              <AlertCircle size={10} />
+                              Salvar título
+                            </span>
+                          )}
                           <button type="button" onClick={() => handleDownload(file)} title="Baixar"
                             className="shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-[var(--engage-blue-400)]/10 hover:text-[var(--engage-blue-800)]">
                             <Download size={14} />
@@ -775,7 +786,7 @@ const PlanilhasView = () => {
                           ) : (
                             <button type="button"
                               onClick={() => handleSincronizar(file.name, colSelected, transpEdit, transpTitulo)}
-                              disabled={!colSelected || !transpEdit.trim() || !transpTitulo.trim() || syncingFile === file.name}
+                              disabled={!colSelected || !transpEdit.trim() || !transpTitulo.trim() || transpTitulo === 'NAO_ENCONTRADO' || syncingFile === file.name}
                               title="Conciliar"
                               className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-40">
                               {syncingFile === file.name ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
@@ -947,12 +958,13 @@ const PlanilhasView = () => {
                                       <span className="font-semibold text-slate-700">{transpEdit}</span>
                                     </span>
                                   )}
-                                  {transpTitulo && (
-                                    <span className="flex items-center gap-1.5">
-                                      <span className="text-slate-400">Título</span>
-                                      <span className="font-semibold text-slate-700">{transpTitulo}</span>
-                                    </span>
-                                  )}
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="text-slate-400">Título</span>
+                                    {transpTitulo && transpTitulo !== 'NAO_ENCONTRADO'
+                                      ? <span className="font-semibold text-slate-700">{transpTitulo}</span>
+                                      : <span className="animate-pulse font-semibold text-red-500">— preencher</span>
+                                    }
+                                  </span>
                                   {colSelected && (
                                     <span className="flex items-center gap-1.5">
                                       <span className="text-slate-400">Coluna CTe</span>
