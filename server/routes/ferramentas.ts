@@ -125,18 +125,18 @@ function parseSheetCteRows(
       if (idx !== -1) { valIdx = idx; break; }
     }
 
-    // Leitura separada sem cellText para valores numéricos — evita interferência do .w na leitura raw
-    const rawWorkbook = XLSX.read(buffer, { type: 'buffer' });
-    const rawSheet = rawWorkbook.Sheets[sheetName];
-    const rawRows = XLSX.utils.sheet_to_json<unknown[]>(rawSheet, { header: 1, defval: null, raw: true });
     const dataRows = allRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
-    const rawDataRows = rawRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
     const pairs: { chave: string; valor: number | null }[] = [];
 
+    // Usa raw:false (texto formatado pelo Excel) para o valor — garante que formatos com
+    // fator de escala (ex: BR #.##0,00 que XLSX interpreta como ÷1000) retornem o valor
+    // visível correto (ex: "1.023,58") em vez do número interno escalado (ex: 1.02358)
     const parseNumeric = (v: unknown): number | null => {
-      if (typeof v === 'number') return v;
       if (v == null || v === '') return null;
-      const s = String(v).trim();
+      if (typeof v === 'number') return isFinite(v) ? v : null;
+      // Remove símbolos de moeda e espaços, mantém dígitos, ponto, vírgula e sinal
+      const s = String(v).trim().replace(/[^\d.,-]/g, '');
+      if (!s) return null;
       const lastDot = s.lastIndexOf('.');
       const lastComma = s.lastIndexOf(',');
       let num: number;
@@ -152,20 +152,6 @@ function parseSheetCteRows(
       return isNaN(num) ? null : num;
     };
 
-    // DEBUG: loga primeiros valores brutos da coluna de valor
-    if (valIdx !== -1) {
-      const sample = rawDataRows.slice(0, 5).map(r => {
-        const v = Array.isArray(r) ? r[valIdx] : undefined;
-        return { type: typeof v, value: v };
-      });
-      console.log('[parseSheetCteRows] raw value sample:', JSON.stringify(sample));
-      const fmtSample = dataRows.slice(0, 5).map(r => {
-        const v = Array.isArray(r) ? (r as unknown[])[valIdx] : undefined;
-        return { type: typeof v, value: v };
-      });
-      console.log('[parseSheetCteRows] fmt value sample (raw:false):', JSON.stringify(fmtSample));
-    }
-
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
       if (!Array.isArray(row)) continue;
@@ -175,8 +161,8 @@ function parseSheetCteRows(
 
       let valor: number | null = null;
       if (valIdx !== -1) {
-        const rawRow = rawDataRows[i];
-        const v = Array.isArray(rawRow) ? rawRow[valIdx] : undefined;
+        // row já é raw:false — texto formatado que o Excel exibe
+        const v = (row as unknown[])[valIdx];
         valor = parseNumeric(v);
       }
       pairs.push({ chave, valor });
