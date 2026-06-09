@@ -495,7 +495,6 @@ const PlanilhasView = () => {
         value: `${result.sent} CTe's · ${result.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
         status: retorno ? 'ok' : 'warn',
       });
-      setActiveTab(retorno ? 'sucesso' : 'erro');
       if (retorno) {
         api.updatePlanilhaMetadata(filename, {
           transportadora: `${sigla} ${titulo}`.trim(),
@@ -512,7 +511,6 @@ const PlanilhasView = () => {
       }
     } catch (err: any) {
       upsertLog(filename, { key: 'conciliar', msg: 'Erro ao conciliar', status: 'warn' });
-      setActiveTab('erro');
       setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
       await alert(err.message || 'Erro ao sincronizar.', 'Erro');
     } finally {
