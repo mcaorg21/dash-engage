@@ -161,7 +161,10 @@ const PlanilhasView = () => {
   const [fileLog, setFileLog] = useState<Record<string, LogEntry[]>>({});
   const [detalhesOpen, setDetalhesOpen] = useState<Record<string, boolean>>({});
   const [editMode, setEditMode] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<'pendente' | 'sucesso' | 'erro'>('pendente');
+  const [activeTab, setActiveTab] = useState<'todos' | 'pendente' | 'sucesso' | 'erro'>('pendente');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Global saved column names (DB)
   const [savedColumnNames, setSavedColumnNames] = useState<string[]>([]);
@@ -333,6 +336,23 @@ const PlanilhasView = () => {
       await alert(err.message || 'Erro ao deletar arquivo.', 'Erro');
     } finally {
       setDeletingFile(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const names: string[] = Array.from(selectedFiles);
+    if (names.length === 0) return;
+    const ok = await danger(`Deletar ${names.length} arquivo${names.length !== 1 ? 's' : ''} selecionado${names.length !== 1 ? 's' : ''}?\n\nEssa acao nao pode ser desfeita.`, 'Deletar selecionados');
+    if (!ok) return;
+    setBulkDeleting(true);
+    try {
+      await Promise.all(names.map(name => api.deletePlanilha(name)));
+      setBucketFiles(prev => prev.filter(f => !names.includes(f.name)));
+      setSelectedFiles(new Set());
+    } catch (err: any) {
+      await alert(err.message || 'Erro ao deletar arquivos.', 'Erro');
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -624,6 +644,23 @@ const PlanilhasView = () => {
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <h2 className="text-base font-bold text-slate-800">Repositorio</h2>
           <div className="flex items-center gap-2">
+            {selectedFiles.size > 0 && (
+              <button type="button" onClick={handleBulkDelete} disabled={bulkDeleting}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-40">
+                {bulkDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                Deletar {selectedFiles.size}
+              </button>
+            )}
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Buscar..."
+                className="h-8 w-40 rounded-lg border border-slate-200 bg-white pl-7 pr-3 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-[var(--engage-blue-400)] focus:ring-1 focus:ring-[var(--engage-blue-400)]/30"
+              />
+            </div>
             <button type="button"
               onClick={() => bucketFiles.forEach(f => fetchColumns(f.name))}
               disabled={isLoadingFiles || bucketFiles.length === 0}
@@ -644,15 +681,18 @@ const PlanilhasView = () => {
         )}
 
         {!isLoadingFiles && !listError && bucketFiles.length > 0 && (() => {
+          const q = searchQuery.trim().toLowerCase();
           const pendentes = bucketFiles.filter(f => !syncResults[f.name]);
           const sucessos  = bucketFiles.filter(f => syncResults[f.name]?.retorno === true);
           const erros     = bucketFiles.filter(f => syncResults[f.name]?.retorno === false);
-          const filesToShow = activeTab === 'sucesso' ? sucessos : activeTab === 'erro' ? erros : pendentes;
+          const baseList  = activeTab === 'todos' ? bucketFiles : activeTab === 'sucesso' ? sucessos : activeTab === 'erro' ? erros : pendentes;
+          const filesToShow = q ? baseList.filter(f => f.name.toLowerCase().includes(q)) : baseList;
+          const allVisibleSelected = filesToShow.length > 0 && filesToShow.every(f => selectedFiles.has(f.name));
           return (
           <>
           {/* Abas */}
           <div className="flex items-center gap-0 border-b border-slate-100 px-4">
-            {([['pendente', 'Pendente', pendentes.length], ['sucesso', 'Sucesso', sucessos.length], ['erro', 'Erro', erros.length]] as const).map(([key, label, count]) => (
+            {([['todos', 'Todos', bucketFiles.length], ['pendente', 'Pendente', pendentes.length], ['sucesso', 'Sucesso', sucessos.length], ['erro', 'Erro', erros.length]] as const).map(([key, label, count]) => (
               <button key={key} type="button" onClick={() => setActiveTab(key)}
                 className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-semibold transition-colors ${activeTab === key ? 'border-violet-500 text-violet-700' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
                 {label}
@@ -660,6 +700,22 @@ const PlanilhasView = () => {
               </button>
             ))}
           </div>
+          {/* Selecionar todos visíveis */}
+          {filesToShow.length > 0 && (
+            <div className="flex items-center gap-2 border-b border-slate-50 px-4 py-1.5">
+              <input type="checkbox" checked={allVisibleSelected} onChange={e => {
+                setSelectedFiles(prev => {
+                  const next = new Set(prev);
+                  if (e.target.checked) filesToShow.forEach(f => next.add(f.name));
+                  else filesToShow.forEach(f => next.delete(f.name));
+                  return next;
+                });
+              }} className="h-3.5 w-3.5 rounded accent-violet-600 cursor-pointer" />
+              <span className="text-xs text-slate-400">
+                {selectedFiles.size > 0 ? `${selectedFiles.size} selecionado${selectedFiles.size !== 1 ? 's' : ''}` : 'Selecionar todos'}
+              </span>
+            </div>
+          )}
 
           <div className="divide-y divide-slate-100">
             {filesToShow.map(file => {
@@ -684,6 +740,9 @@ const PlanilhasView = () => {
                       {/* Linha 1: nome + ações + meta */}
                       <div className="mb-2.5 flex items-center justify-between gap-4">
                         <div className="flex min-w-0 items-center gap-2">
+                          <input type="checkbox" checked={selectedFiles.has(file.name)} onChange={e => {
+                            setSelectedFiles(prev => { const next = new Set(prev); e.target.checked ? next.add(file.name) : next.delete(file.name); return next; });
+                          }} className="h-3.5 w-3.5 shrink-0 rounded accent-violet-600 cursor-pointer" />
                           <FileSpreadsheet size={15} className="shrink-0 text-emerald-500" />
                           <span className="truncate text-sm font-medium text-slate-700" title={file.name}>{file.name}</span>
                           <button type="button" onClick={() => handleDownload(file)} title="Baixar"
