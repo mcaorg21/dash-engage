@@ -103,7 +103,7 @@ function parseSheetCteRows(
     if (!sheetName) return [];
     const sheet = workbook.Sheets[sheetName];
     const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: false });
-    const colLower = (c: string) => c.toLowerCase();
+    const colLower = (c: string) => c.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
     // Encontra coluna de chave CTE
     let headerRowIdx = -1;
@@ -503,7 +503,7 @@ router.get('/planilhas/paired-value-sum', async (req: AuthRequest, res) => {
       'SELECT column_name FROM saved_value_column_names ORDER BY column_name',
     ).catch(() => ({ rows: [] }));
     const savedValueCols = vcRows.map(r => r.column_name);
-    const valueColumns = ['BASE CALC', 'Frete', 'Total Frete', ...savedValueCols];
+    const valueColumns = ['VAL RECEBER', 'Total Servico', 'Total Frete', 'Frete', ...savedValueCols];
     const ctes = parseSheetCteRows(buffer, cteColumn, valueColumns, 1);
     const sum = ctes.reduce((s, c) => s + (c.valor ?? 0), 0);
     res.json({ sum: ctes.length > 0 && sum > 0 ? sum : null, count: ctes.length });
@@ -584,7 +584,7 @@ router.post('/planilhas/sincronizar', async (req: AuthRequest, res) => {
       'SELECT column_name FROM saved_value_column_names ORDER BY column_name',
     ).catch(() => ({ rows: [] }));
     const savedValueCols = vcRows.map(r => r.column_name);
-    const valueColumns = ['BASE CALC', 'Frete', 'Total Frete', ...savedValueCols];
+    const valueColumns = ['VAL RECEBER', 'Total Servico', 'Total Frete', 'Frete', ...savedValueCols];
 
     const ctes = parseSheetCteRows(buffer, cteColumn, valueColumns, valueColumns.some(v => ['Frete', 'Total Frete'].includes(v)) ? 1 : 0);
     const valorTotal = ctes.reduce((sum, c) => sum + (c.valor ?? 0), 0);
