@@ -180,6 +180,7 @@ const PlanilhasView = () => {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const { modal, alert, danger, confirm } = useModal();
   const inputRef = useRef<HTMLInputElement>(null);
+  const cteRetryCount = useRef<Record<string, number>>({});
 
   const extractUrl = `${API_BASE}/ferramentas/planilhas/extract`;
 
@@ -421,6 +422,7 @@ const PlanilhasView = () => {
       const savedSet = new Set(savedColumnNames);
       const autoMatch = headers.find(c => savedSet.has(c));
       if (autoMatch) {
+        cteRetryCount.current[filename] = 0;
         setSelectedColumn(prev => ({ ...prev, [filename]: autoMatch }));
         upsertLog(filename, { key: 'coluna', msg: 'Coluna CTe', value: autoMatch, status: 'ok' });
 
@@ -459,8 +461,16 @@ const PlanilhasView = () => {
           if (tituloFinal.trim() && tituloFinal !== 'NAO_ENCONTRADO') handleSincronizar(filename, autoMatch, editTransportadoras[filename], tituloFinal);
         }
       } else {
-        upsertLog(filename, { key: 'coluna', msg: 'Coluna CTe não detectada automaticamente', status: 'warn' });
-        setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
+        const attempt = (cteRetryCount.current[filename] ?? 0) + 1;
+        cteRetryCount.current[filename] = attempt;
+        if (attempt <= 3) {
+          upsertLog(filename, { key: 'coluna', msg: `Coluna CTe não detectada — tentando novamente (${attempt}/3)...`, status: 'loading' });
+          setTimeout(() => fetchColumns(filename), 3000);
+        } else {
+          cteRetryCount.current[filename] = 0;
+          upsertLog(filename, { key: 'coluna', msg: 'Coluna CTe não detectada automaticamente', status: 'warn' });
+          setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
+        }
       }
 
       // Preenche Título com o primeiro valor da coluna NUMERO DA FATURA
