@@ -125,6 +125,14 @@ function parseSheetCteRows(
       if (idx !== -1) { valIdx = idx; break; }
     }
 
+    // Detecta coluna "CODIGO DE BARRAS DACTE" — se existir, filtra linhas sem esse campo
+    const DACTE_COL = 'codigo de barras dacte';
+    const headerRow = allRows[headerRowIdx];
+    let dacteIdx = -1;
+    if (Array.isArray(headerRow)) {
+      dacteIdx = headerRow.findIndex(v => v != null && colLower(String(v).trim()) === DACTE_COL);
+    }
+
     const dataRows = allRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
     const pairs: { chave: string; valor: number | null }[] = [];
 
@@ -155,6 +163,11 @@ function parseSheetCteRows(
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
       if (!Array.isArray(row)) continue;
+      // Se a planilha tem coluna DACTE, pula linhas sem esse campo preenchido
+      if (dacteIdx !== -1) {
+        const dacte = (row as unknown[])[dacteIdx];
+        if (dacte == null || String(dacte).trim() === '') continue;
+      }
       const chaveRaw = row[cteIdx];
       if (chaveRaw == null || chaveRaw === '') continue;
       const chave = String(chaveRaw).replace(/^'+/, '').trim();
