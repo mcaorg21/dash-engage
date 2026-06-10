@@ -181,6 +181,7 @@ const PlanilhasView = () => {
   const { modal, alert, danger, confirm } = useModal();
   const inputRef = useRef<HTMLInputElement>(null);
   const cteRetryCount = useRef<Record<string, number>>({});
+  const savedColumnNamesRef = useRef<string[]>([]);
 
   const extractUrl = `${API_BASE}/ferramentas/planilhas/extract`;
 
@@ -188,6 +189,7 @@ const PlanilhasView = () => {
     setLoadingSavedNames(true);
     try {
       const names = await api.getMapeamentos();
+      savedColumnNamesRef.current = names;
       setSavedColumnNames(names);
     } catch {
       // non-critical, silently fail
@@ -418,8 +420,8 @@ const PlanilhasView = () => {
         if (!tituloFinal.trim()) setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
       }
 
-      // Auto-select the first column that matches a saved name
-      const savedSet = new Set(savedColumnNames);
+      // Usa ref para garantir valor atualizado mesmo em chamadas via setTimeout
+      const savedSet = new Set(savedColumnNamesRef.current);
       const autoMatch = headers.find(c => savedSet.has(c));
       if (autoMatch) {
         cteRetryCount.current[filename] = 0;
