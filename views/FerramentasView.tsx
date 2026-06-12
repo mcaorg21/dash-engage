@@ -555,7 +555,6 @@ const PlanilhasView = () => {
   const handleCopySql = (filename: string, sql: string) => {
     navigator.clipboard.writeText(sql);
     setCopiedSql(filename);
-    setTimeout(() => setCopiedSql(null), 2000);
   };
 
   const handleClassifyCp = async (filename: string) => {
@@ -785,7 +784,7 @@ const PlanilhasView = () => {
                               </span>
                               {syncResults[file.name]!.retorno && syncResults[file.name]!.sql && (
                                 <button type="button" onClick={() => handleCopySql(file.name, syncResults[file.name]!.sql!)}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-slate-700">
+                                  className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-white transition-colors ${copiedSql === file.name ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-800 hover:bg-slate-700'}`}>
                                   {copiedSql === file.name ? <CheckCircle2 size={11} /> : <Copy size={11} />}
                                   {copiedSql === file.name ? 'Copiado!' : 'SQL'}
                                 </button>
