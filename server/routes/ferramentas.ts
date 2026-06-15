@@ -75,12 +75,13 @@ function parseSheetColumn(buffer: Buffer, column: string): unknown[] {
     }
     if (headerRowIdx === -1) return [];
 
+    const colLower = column.trim().toLowerCase();
     const values: unknown[] = [];
     for (let i = headerRowIdx + 1; i < allRows.length; i++) {
       const row = allRows[i] as unknown[];
       if (!Array.isArray(row)) continue;
       const v = row[colIdx];
-      if (v !== null && v !== undefined && v !== '') values.push(v);
+      if (v !== null && v !== undefined && v !== '' && String(v).trim().toLowerCase() !== colLower) values.push(v);
     }
     return values;
   } catch {
@@ -171,6 +172,8 @@ function parseSheetCteRows(
       const chaveRaw = row[cteIdx];
       if (chaveRaw == null || chaveRaw === '') continue;
       const chave = String(chaveRaw).replace(/^'+/, '').trim();
+      // Pula linhas de cabeçalho repetido no meio dos dados
+      if (colLower(chave) === colLower(cteColumn)) continue;
 
       let valor: number | null = null;
       if (valIdx !== -1) {
