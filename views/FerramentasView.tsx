@@ -1017,7 +1017,7 @@ const PlanilhasView = () => {
                                       <div className="pt-1.5">
                                         <p>CTe's não encontradas:</p>
                                         {syncResults[file.name]!.ctes_nao_encontradas!.split(',').map(cte => cte.trim()).filter(Boolean).map(cte => (
-                                          <p key={cte}>{remInfoMap[cte] ? `${remInfoMap[cte]}_${cte}` : cte}</p>
+                                          <p key={cte}>{remInfoMap[cte] ? `${cte} - ${remInfoMap[cte]}` : cte}</p>
                                         ))}
                                       </div>
                                     )}

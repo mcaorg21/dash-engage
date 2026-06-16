@@ -598,14 +598,14 @@ const getRemInfo = (xmlSource: unknown): string | null => {
   const cnpj = typeof rem.CNPJ === 'string' ? rem.CNPJ : '';
   const ender = rem.enderReme as Record<string, unknown> | undefined;
   const xMun = ender && typeof ender.xMun === 'string' ? ender.xMun : '';
-  const info = [cnpj, xMun].filter(Boolean).join('_');
+  const info = [xMun, cnpj].filter(Boolean).join('_');
   return info || null;
 };
 
 const formatChaveCteComRem = (row: Record<string, unknown>) => {
   const chave = formatCellValue(row.chave_cte);
   const remInfo = getRemInfo(row.json_xml);
-  return remInfo ? `${remInfo}_${chave}` : chave;
+  return remInfo ? `${chave} - ${remInfo}` : chave;
 };
 
 const getXmlContent = (xmlSource: unknown, chaveCte?: string) => {

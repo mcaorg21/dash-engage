@@ -41,7 +41,7 @@ function extractRemInfo(jsonXmlRaw: unknown): string | null {
   const cnpj = typeof rem.CNPJ === 'string' ? rem.CNPJ : '';
   const ender = rem.enderReme as Record<string, unknown> | undefined;
   const xMun = ender && typeof ender.xMun === 'string' ? ender.xMun : '';
-  const info = [cnpj, xMun].filter(Boolean).join('_');
+  const info = [xMun, cnpj].filter(Boolean).join('_');
   return info || null;
 }
 
