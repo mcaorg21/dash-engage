@@ -1005,7 +1005,7 @@ const PlanilhasView = () => {
                                       <p>Diferença qtd: {syncResults[file.name]!.quantidade_diferenca}</p>
                                     )}
                                     {syncResults[file.name]!.ctes_nao_encontradas && (
-                                      <div>
+                                      <div className="pt-1.5">
                                         <p>CTe's não encontradas:</p>
                                         {syncResults[file.name]!.ctes_nao_encontradas!.split(',').map(cte => cte.trim()).filter(Boolean).map(cte => (
                                           <p key={cte}>{cte}</p>
