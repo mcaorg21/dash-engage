@@ -605,7 +605,7 @@ const getRemInfo = (xmlSource: unknown): string | null => {
 const formatChaveCteComRem = (row: Record<string, unknown>) => {
   const chave = formatCellValue(row.chave_cte);
   const remInfo = getRemInfo(row.json_xml);
-  return remInfo ? `${chave} - ${remInfo}` : chave;
+  return remInfo ? `${chave} - ${remInfo.toUpperCase()}` : chave;
 };
 
 const getXmlContent = (xmlSource: unknown, chaveCte?: string) => {
