@@ -970,6 +970,7 @@ const PlanilhasView = () => {
                               </div>
                             ) : (
                               /* Modo leitura */
+                              <div>
                               <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
                                   {transpEdit && (
@@ -1003,9 +1004,10 @@ const PlanilhasView = () => {
                                   className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-50">
                                   Editar
                                 </button>
+                              </div>
                                 {/* Motivo (quando conciliação falhou) */}
                                 {syncResults[file.name] && !syncResults[file.name]!.retorno && (syncResults[file.name]!.valor_diferenca != null || syncResults[file.name]!.quantidade_diferenca != null || syncResults[file.name]!.ctes_nao_encontradas) && (
-                                  <div className="rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs text-red-700 space-y-0.5">
+                                  <div className="mt-2 w-full rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs text-red-700 space-y-0.5">
                                     <p className="font-semibold">Motivo</p>
                                     {syncResults[file.name]!.valor_diferenca != null && (
                                       <p>Diferença valor: {syncResults[file.name]!.valor_diferenca!.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
