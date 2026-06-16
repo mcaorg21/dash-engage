@@ -157,6 +157,7 @@ const PlanilhasView = () => {
   const [syncingFile, setSyncingFile] = useState<string | null>(null);
   const [syncResults, setSyncResults] = useState<Record<string, { sent: number; valorTotal: number; status: number; sql?: string; retorno?: boolean; valor_diferenca?: number; quantidade_diferenca?: number; ctes_nao_encontradas?: string } | null>>({});
   const [copiedSql, setCopiedSql] = useState<string | null>(null);
+  const [remInfoMap, setRemInfoMap] = useState<Record<string, string>>({});
 
   const [fileLog, setFileLog] = useState<Record<string, LogEntry[]>>({});
   const [detalhesOpen, setDetalhesOpen] = useState<Record<string, boolean>>({});
@@ -523,6 +524,14 @@ const PlanilhasView = () => {
       const quantidade_diferenca = typeof body?.quantidade_diferenca === 'number' ? body.quantidade_diferenca : undefined;
       const ctes_nao_encontradas = typeof body?.ctes_nao_encontradas === 'string' ? body.ctes_nao_encontradas : undefined;
       setSyncResults(prev => ({ ...prev, [filename]: { sent: result.sent, valorTotal: result.valorTotal, status: result.webhook.status, retorno, sql, valor_diferenca, quantidade_diferenca, ctes_nao_encontradas } }));
+      if (ctes_nao_encontradas) {
+        const chaves = ctes_nao_encontradas.split(',').map(c => c.trim()).filter(Boolean);
+        if (chaves.length > 0) {
+          api.getQivezRemInfo(chaves).then(map => {
+            setRemInfoMap(prev => ({ ...prev, ...map }));
+          }).catch(() => {});
+        }
+      }
       upsertLog(filename, {
         key: 'conciliar',
         msg: retorno ? 'Conciliado com sucesso' : 'Conciliação não aprovada',
@@ -1008,7 +1017,7 @@ const PlanilhasView = () => {
                                       <div className="pt-1.5">
                                         <p>CTe's não encontradas:</p>
                                         {syncResults[file.name]!.ctes_nao_encontradas!.split(',').map(cte => cte.trim()).filter(Boolean).map(cte => (
-                                          <p key={cte}>{cte}</p>
+                                          <p key={cte}>{remInfoMap[cte] ? `${remInfoMap[cte]}_${cte}` : cte}</p>
                                         ))}
                                       </div>
                                     )}

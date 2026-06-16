@@ -136,6 +136,12 @@ export const api = {
 
   getQivezDashboard: () => request<QivezDashboardResponse>('/qivez/dashboard'),
 
+  getQivezRemInfo: (chaves: string[]) =>
+    request<Record<string, string>>('/qivez/rem-info', {
+      method: 'POST',
+      body: JSON.stringify({ chaves }),
+    }),
+
   getPlanilhas: () => request<BucketFile[]>('/ferramentas/planilhas'),
 
   uploadPlanilhas: async (files: File[]): Promise<{ uploaded: string[] }> => {

@@ -587,6 +587,27 @@ const jsonToXmlDocument = (value: unknown, chaveCteFallback?: string) => {
   return `<cteProc versao="4.00" xmlns="${CTe_XMLNS}"><CTe xmlns="${CTe_XMLNS}">${id ? `<Id>${id}</Id>` : ''}${body}</CTe></cteProc>`;
 };
 
+// Extrai CNPJ + cidade do remetente (infCte.rem) para exibir junto da chave CTe
+const getRemInfo = (xmlSource: unknown): string | null => {
+  if (!xmlSource || typeof xmlSource !== 'object') return null;
+  const record = flattenAttributes(xmlSource) as Record<string, unknown>;
+  const cteNode = record.CTe ? (record.CTe as Record<string, unknown>) : findCTeNode(record);
+  const infCte = cteNode?.infCte as Record<string, unknown> | undefined;
+  const rem = infCte?.rem as Record<string, unknown> | undefined;
+  if (!rem) return null;
+  const cnpj = typeof rem.CNPJ === 'string' ? rem.CNPJ : '';
+  const ender = rem.enderReme as Record<string, unknown> | undefined;
+  const xMun = ender && typeof ender.xMun === 'string' ? ender.xMun : '';
+  const info = [cnpj, xMun].filter(Boolean).join('_');
+  return info || null;
+};
+
+const formatChaveCteComRem = (row: Record<string, unknown>) => {
+  const chave = formatCellValue(row.chave_cte);
+  const remInfo = getRemInfo(row.json_xml);
+  return remInfo ? `${remInfo}_${chave}` : chave;
+};
+
 const getXmlContent = (xmlSource: unknown, chaveCte?: string) => {
   if (!xmlSource) return '';
 
@@ -863,8 +884,8 @@ const QivezListarView = () => {
                     <td className="whitespace-nowrap px-4 py-3">
                       <SistemaBadge value={row.sistema} />
                     </td>
-                    <td className="max-w-[360px] truncate whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={formatCellValue(row.chave_cte)}>
-                      {formatCellValue(row.chave_cte)}
+                    <td className="max-w-[360px] truncate whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={formatChaveCteComRem(row)}>
+                      {formatChaveCteComRem(row)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatCellValue(row.tipo)}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(row.valor)}</td>

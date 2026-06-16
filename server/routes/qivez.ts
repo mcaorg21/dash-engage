@@ -18,6 +18,57 @@ async function hasPermission(req: AuthRequest, permission: string) {
 
 router.use(authenticate);
 
+// Busca recursivamente o no infCte dentro do json_xml (pode estar aninhado em wrappers diferentes)
+function findInfCte(obj: unknown): Record<string, unknown> | null {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  const record = obj as Record<string, unknown>;
+  if (record.infCte && typeof record.infCte === 'object') return record.infCte as Record<string, unknown>;
+  for (const val of Object.values(record)) {
+    const found = findInfCte(val);
+    if (found) return found;
+  }
+  return null;
+}
+
+function extractRemInfo(jsonXmlRaw: unknown): string | null {
+  let jsonXml = jsonXmlRaw;
+  if (typeof jsonXml === 'string') {
+    try { jsonXml = JSON.parse(jsonXml); } catch { return null; }
+  }
+  const infCte = findInfCte(jsonXml);
+  const rem = infCte?.rem as Record<string, unknown> | undefined;
+  if (!rem) return null;
+  const cnpj = typeof rem.CNPJ === 'string' ? rem.CNPJ : '';
+  const ender = rem.enderReme as Record<string, unknown> | undefined;
+  const xMun = ender && typeof ender.xMun === 'string' ? ender.xMun : '';
+  const info = [cnpj, xMun].filter(Boolean).join('_');
+  return info || null;
+}
+
+router.post('/rem-info', async (req: AuthRequest, res) => {
+  try {
+    const chaves: string[] = Array.isArray(req.body?.chaves)
+      ? req.body.chaves.filter((c: unknown): c is string => typeof c === 'string' && c.trim() !== '')
+      : [];
+    if (chaves.length === 0) { res.json({}); return; }
+
+    const result = await pool.query(
+      'SELECT chave_cte, json_xml FROM lancamentos_financeiros WHERE chave_cte = ANY($1)',
+      [chaves],
+    );
+
+    const map: Record<string, string> = {};
+    for (const row of result.rows) {
+      const info = extractRemInfo(row.json_xml);
+      if (info) map[row.chave_cte] = info;
+    }
+    res.json(map);
+  } catch (err) {
+    console.error('Qivez rem-info error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 router.get('/dashboard', async (req: AuthRequest, res) => {
   try {
     const allowed = await hasPermission(req, 'conciliacao_qivez_painel');
