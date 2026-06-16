@@ -137,7 +137,7 @@ export const api = {
   getQivezDashboard: () => request<QivezDashboardResponse>('/qivez/dashboard'),
 
   getQivezRemInfo: (chaves: string[]) =>
-    request<Record<string, string>>('/qivez/rem-info', {
+    request<Record<string, { remInfo: string | null; json_xml: unknown }>>('/qivez/rem-info', {
       method: 'POST',
       body: JSON.stringify({ chaves }),
     }),

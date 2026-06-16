@@ -57,10 +57,9 @@ router.post('/rem-info', async (req: AuthRequest, res) => {
       [chaves],
     );
 
-    const map: Record<string, string> = {};
+    const map: Record<string, { remInfo: string | null; json_xml: unknown }> = {};
     for (const row of result.rows) {
-      const info = extractRemInfo(row.json_xml);
-      if (info) map[row.chave_cte] = info;
+      map[row.chave_cte] = { remInfo: extractRemInfo(row.json_xml), json_xml: row.json_xml };
     }
     res.json(map);
   } catch (err) {

@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle2, ChevronDown, Copy, Download, FileSpreadsheet
 import { api, type BucketFile } from '../utils/api';
 import { useModal } from '../components/useModal';
 import { TRANSPORTADORAS } from '../utils/transportadoras';
+import { downloadCteXmlZip } from '../utils/cteXml';
 
 const ACCEPTED = ['.xlsx', '.xls', '.csv', '.ods', '.xlsm', '.tsv'];
 type LogEntry = { key: string; msg: string; value?: string; status: 'loading' | 'ok' | 'warn' };
@@ -157,7 +158,8 @@ const PlanilhasView = () => {
   const [syncingFile, setSyncingFile] = useState<string | null>(null);
   const [syncResults, setSyncResults] = useState<Record<string, { sent: number; valorTotal: number; status: number; sql?: string; retorno?: boolean; valor_diferenca?: number; quantidade_diferenca?: number; ctes_nao_encontradas?: string } | null>>({});
   const [copiedSql, setCopiedSql] = useState<string | null>(null);
-  const [remInfoMap, setRemInfoMap] = useState<Record<string, string>>({});
+  const [remInfoMap, setRemInfoMap] = useState<Record<string, { remInfo: string | null; json_xml: unknown }>>({});
+  const [downloadingZip, setDownloadingZip] = useState<string | null>(null);
 
   const [fileLog, setFileLog] = useState<Record<string, LogEntry[]>>({});
   const [detalhesOpen, setDetalhesOpen] = useState<Record<string, boolean>>({});
@@ -564,6 +566,30 @@ const PlanilhasView = () => {
   const handleCopySql = (filename: string, sql: string) => {
     navigator.clipboard.writeText(sql);
     setCopiedSql(filename);
+  };
+
+  const handleDownloadAllCtes = async (filename: string, ctesNaoEncontradas: string) => {
+    const chaves = ctesNaoEncontradas.split(',').map(c => c.trim()).filter(Boolean);
+    if (chaves.length === 0) return;
+    setDownloadingZip(filename);
+    try {
+      let map = remInfoMap;
+      const missing = chaves.filter(c => !map[c]);
+      if (missing.length > 0) {
+        const fetched = await api.getQivezRemInfo(missing);
+        map = { ...map, ...fetched };
+        setRemInfoMap(map);
+      }
+      const entries = chaves
+        .filter(c => map[c]?.json_xml)
+        .map(c => ({ chave: c, json_xml: map[c]!.json_xml }));
+      const ok = entries.length > 0 && await downloadCteXmlZip(entries, `ctes-nao-encontradas-${filename.replace(/\.[^.]+$/, '')}.zip`);
+      if (!ok) await alert('Nenhuma CTe encontrada no banco de dados para download.', 'Aviso');
+    } catch (err: any) {
+      await alert(err.message || 'Erro ao baixar CTes.', 'Erro');
+    } finally {
+      setDownloadingZip(null);
+    }
   };
 
   const handleClassifyCp = async (filename: string) => {
@@ -1017,9 +1043,18 @@ const PlanilhasView = () => {
                                     )}
                                     {syncResults[file.name]!.ctes_nao_encontradas && (
                                       <div className="pt-1.5">
-                                        <p>CTe's não encontradas:</p>
+                                        <div className="flex items-center justify-between gap-2">
+                                          <p>CTe's não encontradas:</p>
+                                          <button type="button"
+                                            onClick={() => handleDownloadAllCtes(file.name, syncResults[file.name]!.ctes_nao_encontradas!)}
+                                            disabled={downloadingZip === file.name}
+                                            className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50">
+                                            {downloadingZip === file.name ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
+                                            Baixar todas
+                                          </button>
+                                        </div>
                                         {syncResults[file.name]!.ctes_nao_encontradas!.split(',').map(cte => cte.trim()).filter(Boolean).map(cte => (
-                                          <p key={cte}>{remInfoMap[cte] ? `${cte} - ${remInfoMap[cte].toUpperCase()}` : cte}</p>
+                                          <p key={cte}>{remInfoMap[cte]?.remInfo ? `${cte} - ${remInfoMap[cte]!.remInfo!.toUpperCase()}` : cte}</p>
                                         ))}
                                       </div>
                                     )}
