@@ -452,7 +452,14 @@ const PlanilhasView = () => {
             if (sigla) {
               setEditTransportadoras(prev => ({ ...prev, [filename]: sigla }));
               upsertLog(filename, { key: 'sigla', msg: 'Sigla', value: sigla, status: 'ok' });
-              if (tituloFinal.trim() && tituloFinal !== 'NAO_ENCONTRADO') handleSincronizar(filename, autoMatch, sigla, tituloFinal);
+              let tituloSync = tituloFinal;
+              if (sigla === 'PTR') {
+                const parts = tituloSync.split('-');
+                tituloSync = parts[parts.length - 1];
+                setEditTransportadoraTextos(prev => ({ ...prev, [filename]: tituloSync }));
+                upsertLog(filename, { key: 'titulo', msg: 'Título', value: tituloSync, status: 'ok' });
+              }
+              if (tituloSync.trim() && tituloSync !== 'NAO_ENCONTRADO') handleSincronizar(filename, autoMatch, sigla, tituloSync);
             } else {
               upsertLog(filename, { key: 'sigla', msg: 'Sigla não detectada automaticamente', status: 'warn' });
               setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
@@ -463,7 +470,14 @@ const PlanilhasView = () => {
           });
         } else {
           upsertLog(filename, { key: 'sigla', msg: 'Sigla', value: editTransportadoras[filename], status: 'ok' });
-          if (tituloFinal.trim() && tituloFinal !== 'NAO_ENCONTRADO') handleSincronizar(filename, autoMatch, editTransportadoras[filename], tituloFinal);
+          let tituloSync2 = tituloFinal;
+          if (editTransportadoras[filename] === 'PTR') {
+            const parts = tituloSync2.split('-');
+            tituloSync2 = parts[parts.length - 1];
+            setEditTransportadoraTextos(prev => ({ ...prev, [filename]: tituloSync2 }));
+            upsertLog(filename, { key: 'titulo', msg: 'Título', value: tituloSync2, status: 'ok' });
+          }
+          if (tituloSync2.trim() && tituloSync2 !== 'NAO_ENCONTRADO') handleSincronizar(filename, autoMatch, editTransportadoras[filename], tituloSync2);
         }
       } else {
         const attempt = (cteRetryCount.current[filename] ?? 0) + 1;
@@ -514,6 +528,10 @@ const PlanilhasView = () => {
   };
 
   const handleSincronizar = async (filename: string, cteColumn: string, sigla: string, titulo: string) => {
+    if (sigla === 'PTR') {
+      const parts = titulo.split('-');
+      titulo = parts[parts.length - 1];
+    }
     setSyncingFile(filename);
     upsertLog(filename, { key: 'conciliar', msg: 'Conciliando...', status: 'loading' });
     try {
