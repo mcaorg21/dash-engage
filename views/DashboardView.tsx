@@ -543,6 +543,25 @@ const SistemaBadge = ({ value }: { value: unknown }) => {
   );
 };
 
+const normalizeEmpresaOptions = (values: string[]) => {
+  const map = new Map<string, string>();
+
+  for (const value of values) {
+    const normalized = value.trim().replace(/\s+/g, ' ');
+    if (!normalized) continue;
+
+    const key = normalized.toLocaleLowerCase('pt-BR');
+    if (!map.has(key)) {
+      map.set(
+        key,
+        normalized.toLocaleLowerCase('pt-BR').replace(/(^|\s)\S/g, letter => letter.toLocaleUpperCase('pt-BR')),
+      );
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+};
+
 const QivezListarView = () => {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -551,11 +570,14 @@ const QivezListarView = () => {
   const [dataFim, setDataFim] = useState('');
   const [chaveCte, setChaveCte] = useState('');
   const [sistema, setSistema] = useState('');
+  const [empresa, setEmpresa] = useState('');
   const [sistemas, setSistemas] = useState<string[]>([]);
-  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '' });
+  const [empresas, setEmpresas] = useState<string[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '', empresa: '' });
 
   useEffect(() => {
     api.getQivezSistemas().then(setSistemas).catch(() => {});
+    api.getQivezEmpresas().then(values => setEmpresas(normalizeEmpresaOptions(values))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -602,10 +624,10 @@ const QivezListarView = () => {
         <div className="border-b border-slate-100 px-6 py-4">
           <div className="w-full">
             <form
-              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_auto_auto_auto] lg:items-end"
+              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto_auto] lg:items-end"
               onSubmit={event => {
                 event.preventDefault();
-                setAppliedFilters({ dataInicio, dataFim, chaveCte: chaveCte.trim(), sistema: sistema.trim() });
+                setAppliedFilters({ dataInicio, dataFim, chaveCte: chaveCte.trim(), sistema: sistema.trim(), empresa: empresa.trim() });
               }}
             >
               <div>
@@ -639,6 +661,20 @@ const QivezListarView = () => {
                 />
               </div>
 
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Empresa</label>
+                <select
+                  value={empresa}
+                  onChange={event => setEmpresa(event.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                >
+                  <option value="">Todos</option>
+                  {empresas.map(item => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+              </div>
+
               <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
                 Filtrar
               </button>
@@ -651,7 +687,8 @@ const QivezListarView = () => {
                   setDataFim('');
                   setChaveCte('');
                   setSistema('');
-                  setAppliedFilters({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '' });
+                  setEmpresa('');
+                  setAppliedFilters({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '', empresa: '' });
                 }}
               >
                 Limpar
@@ -916,6 +953,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [showLogoFallback, setShowLogoFallback] = useState(false);
+  const [naoConciliadasCount, setNaoConciliadasCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -941,6 +979,14 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
       clearInterval(interval);
     };
   }, [onLogout]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getQivezLancamentosCount()
+      .then(({ total }) => { if (!cancelled) setNaoConciliadasCount(total); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const hasPermission = (id: string) => isAdmin || userPermissions.includes(id);
   const hasAnyQivezPermission = qivezTabs.some(tab => hasPermission(tab.id));
@@ -1007,6 +1053,11 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
               >
                 <span className="flex items-center gap-3">
                   <FileText size={18} /> CTe
+                  {!isQivezOpen && naoConciliadasCount > 0 && (
+                    <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                      {naoConciliadasCount}
+                    </span>
+                  )}
                 </span>
                 {isQivezOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
               </button>
@@ -1024,6 +1075,11 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
                         className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                       >
                         <Icon size={16} /> {tab.label}
+                        {tab.id === 'conciliacao_qivez_listar' && naoConciliadasCount > 0 && (
+                          <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                            {naoConciliadasCount}
+                          </span>
+                        )}
                       </button>
                     );
                   })}

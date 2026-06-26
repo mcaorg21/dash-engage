@@ -128,6 +128,53 @@ router.get('/sistemas', async (req: AuthRequest, res) => {
   }
 });
 
+const remetenteEmpresaSql = `
+  COALESCE(
+    json_xml::jsonb #>> '{ctePrc,CTe,infCte,rem,enderReme,xMun}',
+    json_xml::jsonb #>> '{cteProc,CTe,infCte,rem,enderReme,xMun}',
+    json_xml::jsonb #>> '{CTe,infCte,rem,enderReme,xMun}'
+  )
+`;
+
+router.get('/empresas', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_qivez_listar');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const result = await pool.query(`
+      SELECT INITCAP(MIN(BTRIM(${remetenteEmpresaSql}))) AS empresa
+      FROM public.lancamentos_financeiros
+      WHERE cancelada = false
+        AND (existe_qives_sysemp = false OR existe_sysemp_qives = false)
+        AND NULLIF(BTRIM(${remetenteEmpresaSql}), '') IS NOT NULL
+      GROUP BY LOWER(BTRIM(${remetenteEmpresaSql}))
+      ORDER BY empresa
+    `);
+    res.json(result.rows.map((r: { empresa: string }) => r.empresa));
+  } catch (err) {
+    console.error('Qivez empresas error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+router.get('/lancamentos/count', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_qivez_listar');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const result = await pool.query(`
+      SELECT COUNT(*)::int AS total
+      FROM public.lancamentos_financeiros
+      WHERE cancelada = false
+        AND (existe_qives_sysemp = false OR existe_sysemp_qives = false)
+    `);
+    res.json({ total: result.rows[0]?.total ?? 0 });
+  } catch (err) {
+    console.error('Qivez lancamentos count error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 router.get('/lancamentos', async (req: AuthRequest, res) => {
   try {
     const allowed = await hasPermission(req, 'conciliacao_qivez_listar');
@@ -136,7 +183,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
       return;
     }
 
-    const { dataInicio, dataFim, chaveCte, sistema } = req.query;
+    const { dataInicio, dataFim, chaveCte, sistema, empresa } = req.query;
     const filters = ['cancelada = false', '(existe_qives_sysemp = false OR existe_sysemp_qives = false)'];
     const values: string[] = [];
 
@@ -160,6 +207,11 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
       filters.push(`sistema ILIKE $${values.length}`);
     }
 
+    if (typeof empresa === 'string' && empresa.trim()) {
+      values.push(`%${empresa.trim()}%`);
+      filters.push(`${remetenteEmpresaSql} ILIKE $${values.length}`);
+    }
+
     const result = await pool.query(`
       SELECT
         id,
@@ -167,6 +219,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
         chave_cte,
         tipo,
         sistema::text AS sistema,
+        ${remetenteEmpresaSql} AS empresa,
         diferenca_valor AS valor,
         json_xml
       FROM public.lancamentos_financeiros
