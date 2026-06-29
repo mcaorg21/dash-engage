@@ -565,6 +565,7 @@ const normalizeEmpresaOptions = (values: string[]) => {
 const QivezListarView = () => {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
@@ -579,6 +580,14 @@ const QivezListarView = () => {
     api.getQivezSistemas().then(setSistemas).catch(() => {});
     api.getQivezEmpresas().then(values => setEmpresas(normalizeEmpresaOptions(values))).catch(() => {});
   }, []);
+
+  const getCurrentFilters = () => ({
+    dataInicio,
+    dataFim,
+    chaveCte: chaveCte.trim(),
+    sistema: sistema.trim(),
+    empresa: empresa.trim(),
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -627,7 +636,7 @@ const QivezListarView = () => {
               className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto_auto] lg:items-end"
               onSubmit={event => {
                 event.preventDefault();
-                setAppliedFilters({ dataInicio, dataFim, chaveCte: chaveCte.trim(), sistema: sistema.trim(), empresa: empresa.trim() });
+                setAppliedFilters(getCurrentFilters());
               }}
             >
               <div>
@@ -696,12 +705,27 @@ const QivezListarView = () => {
 
               <button
                 type="button"
-                disabled={rows.length === 0}
+                disabled={isLoading || isDownloading}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--engage-blue-400)]/10 px-4 py-2 text-sm font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40"
-                onClick={() => downloadFilteredXmlZip(rows)}
+                onClick={async () => {
+                  const filters = getCurrentFilters();
+                  setAppliedFilters(filters);
+                  setIsDownloading(true);
+                  setError(null);
+
+                  try {
+                    const filteredRows = await api.getQivezLancamentos(filters);
+                    setRows(filteredRows);
+                    await downloadFilteredXmlZip(filteredRows);
+                  } catch (err: any) {
+                    setError(err.message || 'Erro ao baixar lancamentos filtrados.');
+                  } finally {
+                    setIsDownloading(false);
+                  }
+                }}
               >
                 <Download size={16} />
-                Baixar filtrados
+                {isDownloading ? 'Baixando...' : 'Baixar filtrados'}
               </button>
             </form>
           </div>
