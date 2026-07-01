@@ -253,11 +253,12 @@ function parseSheetCell(buffer: Buffer, cellRef: string): string | null {
 
 function parseSheetColumnSum(buffer: Buffer, column: string, skipLastRows = 0): number | null {
   try {
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    // cellText + raw:false retorna o texto formatado pelo Excel (ex: "10.500,00" em vez do número 10500)
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellText: true });
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) return null;
     const sheet = workbook.Sheets[sheetName];
-    const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: true });
+    const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: false });
     const colLower = column.toLowerCase();
 
     let headerRowIdx = -1;
@@ -270,32 +271,47 @@ function parseSheetColumnSum(buffer: Buffer, column: string, skipLastRows = 0): 
     }
     if (headerRowIdx === -1) return null;
 
-    // Coleta todos os valores numéricos da coluna
+    const parseNumeric = (v: unknown): number | null => {
+      if (v == null || v === '') return null;
+      if (typeof v === 'number') return isFinite(v) ? v : null;
+      const s = String(v).trim().replace(/[^\d.,-]/g, '');
+      if (!s) return null;
+      const lastDot = s.lastIndexOf('.');
+      const lastComma = s.lastIndexOf(',');
+      if (lastComma > lastDot) return parseFloat(s.replace(/\./g, '').replace(',', '.'));
+      if (lastDot > lastComma) return parseFloat(s.replace(/,/g, ''));
+      return parseFloat(s);
+    };
+
+    const displayStrings: string[] = [];
     const nums: number[] = [];
     for (let i = headerRowIdx + 1; i < allRows.length; i++) {
       const row = allRows[i] as unknown[];
       if (!Array.isArray(row)) continue;
       const v = row[colIdx];
       if (v != null && v !== '') {
-        let num: number;
-        if (typeof v === 'number') {
-          num = v;
-        } else {
-          const s = String(v).trim().replace(/\./g, '').replace(',', '.');
-          num = parseFloat(s);
+        const num = parseNumeric(v);
+        if (num !== null && !isNaN(num)) {
+          nums.push(num);
+          displayStrings.push(String(v));
         }
-        if (!isNaN(num)) nums.push(num);
       }
     }
 
     // Remove os últimos N valores não-vazios (ex: linha de total)
     const values = skipLastRows > 0 ? nums.slice(0, -skipLastRows) : nums;
+    const displays = skipLastRows > 0 ? displayStrings.slice(0, -skipLastRows) : displayStrings;
     if (values.length === 0) return null;
 
     const sum = values.reduce((a, b) => a + b, 0);
-    const integerCount = values.filter(n => n % 1 === 0).length;
-    const likelyCentavos = (integerCount / values.length) >= 0.9;
-    return likelyCentavos ? sum / 100 : sum;
+    // Heurística de centavos só aplica quando nenhum valor exibido tem separador decimal (vírgula BR)
+    // Valores como "10.500,00" revelam casas decimais explícitas — não são centavos
+    const hasDecimalDisplay = displays.some(s => s.includes(','));
+    if (!hasDecimalDisplay) {
+      const integerCount = values.filter(n => n % 1 === 0).length;
+      if ((integerCount / values.length) >= 0.9) return sum / 100;
+    }
+    return sum;
   } catch {
     return null;
   }
