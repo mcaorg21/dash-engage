@@ -161,6 +161,8 @@ function parseSheetCteRows(
       return isNaN(num) ? null : num;
     };
 
+    const valorDisplayStrings: string[] = [];
+
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
       if (!Array.isArray(row)) continue;
@@ -177,19 +179,23 @@ function parseSheetCteRows(
 
       let valor: number | null = null;
       if (valIdx !== -1) {
-        // row já é raw:false — texto formatado que o Excel exibe
         const v = (row as unknown[])[valIdx];
         valor = parseNumeric(v);
+        if (valor !== null) valorDisplayStrings.push(String(v ?? ''));
       }
       pairs.push({ chave, valor });
     }
 
-    // Detecta se valores estão em centavos (>=90% inteiros)
-    const numericVals = pairs.map(p => p.valor).filter((v): v is number => v != null);
-    if (numericVals.length > 0) {
-      const intCount = numericVals.filter(v => v % 1 === 0).length;
-      if (intCount / numericVals.length >= 0.9) {
-        return pairs.map(p => ({ ...p, valor: p.valor != null ? p.valor / 100 : null }));
+    // Heurística de centavos só aplica quando nenhum valor exibido tem separador decimal (vírgula BR)
+    // Ex: "10.500,00" revela casas decimais — não é centavo, não divide por 100
+    const hasDecimalDisplay = valorDisplayStrings.some(s => s.includes(','));
+    if (!hasDecimalDisplay) {
+      const numericVals = pairs.map(p => p.valor).filter((v): v is number => v != null);
+      if (numericVals.length > 0) {
+        const intCount = numericVals.filter(v => v % 1 === 0).length;
+        if (intCount / numericVals.length >= 0.9) {
+          return pairs.map(p => ({ ...p, valor: p.valor != null ? p.valor / 100 : null }));
+        }
       }
     }
     return pairs;
