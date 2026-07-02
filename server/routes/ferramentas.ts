@@ -374,8 +374,46 @@ async function handleExtract(_req: AuthRequest, res: Response) {
   }
 }
 
-// Extract aceita JWT ou X-API-Key estatica (para n8n)
+// Rotas que aceitam JWT ou X-API-Key estatica (para n8n)
 router.get('/planilhas/extract', apiKeyOrJwt, handleExtract);
+
+router.post('/planilhas/upload-base64', apiKeyOrJwt, async (req: AuthRequest, res) => {
+  try {
+    const files: { name: string; data: string; mimeType?: string }[] = Array.isArray(req.body?.files)
+      ? req.body.files
+      : [];
+
+    if (files.length === 0) {
+      res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+      return;
+    }
+
+    const bucket = gcs.bucket(BUCKET_NAME);
+    const uploaded: string[] = [];
+
+    await Promise.all(
+      files.map(file => {
+        if (!file.name || !file.data) throw new Error(`Arquivo inválido: name e data são obrigatórios.`);
+        const buffer = Buffer.from(file.data, 'base64');
+        const blob = bucket.file(file.name);
+        return new Promise<void>((resolve, reject) => {
+          const stream = blob.createWriteStream({
+            metadata: { contentType: file.mimeType || 'application/octet-stream' },
+            resumable: false,
+          });
+          stream.on('error', reject);
+          stream.on('finish', () => { uploaded.push(file.name); resolve(); });
+          stream.end(buffer);
+        });
+      }),
+    );
+
+    res.json({ uploaded });
+  } catch (err: any) {
+    console.error('GCS upload-base64 error:', err);
+    res.status(500).json({ error: err.message || 'Erro ao fazer upload dos arquivos.' });
+  }
+});
 
 router.use(authenticate);
 
@@ -433,44 +471,6 @@ router.post('/planilhas/upload', upload.array('files'), async (req: AuthRequest,
   } catch (err) {
     console.error('GCS upload error:', err);
     res.status(500).json({ error: 'Erro ao fazer upload dos arquivos.' });
-  }
-});
-
-router.post('/planilhas/upload-base64', apiKeyOrJwt, async (req: AuthRequest, res) => {
-  try {
-    const files: { name: string; data: string; mimeType?: string }[] = Array.isArray(req.body?.files)
-      ? req.body.files
-      : [];
-
-    if (files.length === 0) {
-      res.status(400).json({ error: 'Nenhum arquivo enviado.' });
-      return;
-    }
-
-    const bucket = gcs.bucket(BUCKET_NAME);
-    const uploaded: string[] = [];
-
-    await Promise.all(
-      files.map(file => {
-        if (!file.name || !file.data) throw new Error(`Arquivo inválido: name e data são obrigatórios.`);
-        const buffer = Buffer.from(file.data, 'base64');
-        const blob = bucket.file(file.name);
-        return new Promise<void>((resolve, reject) => {
-          const stream = blob.createWriteStream({
-            metadata: { contentType: file.mimeType || 'application/octet-stream' },
-            resumable: false,
-          });
-          stream.on('error', reject);
-          stream.on('finish', () => { uploaded.push(file.name); resolve(); });
-          stream.end(buffer);
-        });
-      }),
-    );
-
-    res.json({ uploaded });
-  } catch (err: any) {
-    console.error('GCS upload-base64 error:', err);
-    res.status(500).json({ error: err.message || 'Erro ao fazer upload dos arquivos.' });
   }
 });
 
