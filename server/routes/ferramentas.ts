@@ -665,9 +665,10 @@ router.post('/planilhas/sincronizar', async (req: AuthRequest, res) => {
     const ctes = parseSheetCteRows(buffer, cteColumn, valueColumns, valueColumns.some(v => ['Frete', 'Total Frete'].includes(v)) ? 1 : 0);
     const valorTotal = ctes.reduce((sum, c) => sum + (c.valor ?? 0), 0);
 
-    const chaves_cte = ctes.map(c => `'${c.chave.replace("'", "")}'`).join(',');
-    const total_ctes = ctes.length;
-    const payload = { sigla, titulo, transportadora_titulo, arquivo: filename, valorTotal, total_ctes, chaves_cte, ctes };
+    const ctesNormalized = ctes.map(c => ({ ...c, chave: c.chave.replace(/\D/g, '') }));
+    const chaves_cte = ctesNormalized.map(c => `'${c.chave}'`).join(',');
+    const total_ctes = ctesNormalized.length;
+    const payload = { sigla, titulo, transportadora_titulo, arquivo: filename, valorTotal, total_ctes, chaves_cte, ctes: ctesNormalized };
 
     const webhookRes = await fetch(SYNC_WEBHOOK, {
       method: 'POST',
