@@ -969,10 +969,10 @@ const QivezCanceladasView = () => {
 };
 
 const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void }) => {
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isQivezOpen, setIsQivezOpen] = useState(false);
-  const [isFerramentasOpen, setIsFerramentasOpen] = useState(false);
+  const [isQivezOpen, setIsQivezOpen] = useState(() => localStorage.getItem('menuQivezOpen') === 'true');
+  const [isFerramentasOpen, setIsFerramentasOpen] = useState(() => localStorage.getItem('menuFerramentasOpen') === 'true');
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -1018,7 +1018,22 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
+    localStorage.setItem('activeTab', tab);
     setIsMobileMenuOpen(false);
+  };
+
+  const handleQivezToggle = () => {
+    setIsQivezOpen(prev => {
+      localStorage.setItem('menuQivezOpen', String(!prev));
+      return !prev;
+    });
+  };
+
+  const handleFerramentasToggle = () => {
+    setIsFerramentasOpen(prev => {
+      localStorage.setItem('menuFerramentasOpen', String(!prev));
+      return !prev;
+    });
   };
 
   return (
@@ -1072,7 +1087,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
                 Conciliacao
               </div>
               <button
-                onClick={() => setIsQivezOpen(!isQivezOpen)}
+                onClick={handleQivezToggle}
                 className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${qivezTabs.some(tab => tab.id === activeTab) ? 'bg-white/15 text-white ring-1 ring-white/15' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
               >
                 <span className="flex items-center gap-3">
@@ -1118,7 +1133,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
                 Ferramentas
               </div>
               <button
-                onClick={() => setIsFerramentasOpen(!isFerramentasOpen)}
+                onClick={handleFerramentasToggle}
                 className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${ferramentasTabs.some(tab => tab.id === activeTab) ? 'bg-white/15 text-white ring-1 ring-white/15' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
               >
                 <span className="flex items-center gap-3">
