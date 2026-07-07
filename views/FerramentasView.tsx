@@ -186,6 +186,7 @@ const PlanilhasView = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const cteRetryCount = useRef<Record<string, number>>({});
   const savedColumnNamesRef = useRef<string[]>([]);
+  const initialConciliacoesRef = useRef<string[]>([]); // snapshot dos nomes ao carregar a página
 
   const extractUrl = `${API_BASE}/ferramentas/planilhas/extract`;
 
@@ -215,6 +216,7 @@ const PlanilhasView = () => {
     try {
       const data = await api.getConciliacoes();
       setConciliacoes(data);
+      initialConciliacoesRef.current = data.map(r => r.nome_arquivo);
     } catch {
       // non-critical
     }
@@ -776,11 +778,11 @@ const PlanilhasView = () => {
 
         {!isLoadingFiles && !listError && bucketFiles.length > 0 && (() => {
           const q = searchQuery.trim().toLowerCase();
-          const dbCountFor = (name: string) => conciliacoes.filter(c => c.nome_arquivo === name).length;
+          const snapshotCountFor = (name: string) => initialConciliacoesRef.current.filter(n => n === name).length;
           const pendentes  = bucketFiles.filter(f => !syncResults[f.name]);
-          const sucessos   = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && dbCountFor(f.name) <= 1);
+          const sucessos   = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && snapshotCountFor(f.name) === 0);
           const erros      = bucketFiles.filter(f => syncResults[f.name]?.retorno === false);
-          const jaConciliadas = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && dbCountFor(f.name) > 1);
+          const jaConciliadas = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && snapshotCountFor(f.name) > 0);
           const baseList   = activeTab === 'todos' ? bucketFiles
             : activeTab === 'sucesso' ? sucessos
             : activeTab === 'erro'    ? erros
