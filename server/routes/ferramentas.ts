@@ -686,6 +686,40 @@ router.post('/planilhas/sincronizar', async (req: AuthRequest, res) => {
   }
 });
 
+// ── Histórico de conciliações ────────────────────────────────────────────────
+
+router.get('/planilhas/conciliadas', async (_req, res) => {
+  try {
+    const { rows } = await pool.query<{
+      id: number; nome_arquivo: string; sigla: string; titulo: string;
+      coluna_cte: string; total_ctes: number; valor_total: string;
+      sql_retorno: string | null; conciliado_por: string | null; conciliado_em: string;
+    }>('SELECT * FROM planilhas_conciliadas ORDER BY conciliado_em DESC');
+    res.json(rows.map(r => ({ ...r, valor_total: Number(r.valor_total) })));
+  } catch (err) {
+    console.error('DB conciliadas GET error:', err);
+    res.status(500).json({ error: 'Erro ao buscar conciliações.' });
+  }
+});
+
+router.post('/planilhas/conciliadas', async (req: AuthRequest, res) => {
+  try {
+    const { nome_arquivo, sigla, titulo, coluna_cte, total_ctes, valor_total, sql_retorno } = req.body ?? {};
+    if (!nome_arquivo || sigla == null || titulo == null || !coluna_cte || total_ctes == null || valor_total == null) {
+      res.status(400).json({ error: 'Campos obrigatórios ausentes.' }); return;
+    }
+    const { rows } = await pool.query<{ id: number; conciliado_em: string }>(
+      `INSERT INTO planilhas_conciliadas (nome_arquivo, sigla, titulo, coluna_cte, total_ctes, valor_total, sql_retorno, conciliado_por)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, conciliado_em`,
+      [nome_arquivo, sigla, titulo, coluna_cte, Number(total_ctes), Number(valor_total), sql_retorno ?? null, req.userEmail ?? null],
+    );
+    res.json({ id: rows[0].id, conciliado_em: rows[0].conciliado_em });
+  } catch (err) {
+    console.error('DB conciliadas POST error:', err);
+    res.status(500).json({ error: 'Erro ao salvar conciliação.' });
+  }
+});
+
 router.get('/planilhas/download', async (req: AuthRequest, res) => {
   try {
     const filename = String(req.query.file || '');

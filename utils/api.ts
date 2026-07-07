@@ -49,6 +49,19 @@ export interface BucketFile {
   valor_total: number | null;
 }
 
+export interface ConciliacaoRecord {
+  id: number;
+  nome_arquivo: string;
+  sigla: string;
+  titulo: string;
+  coluna_cte: string;
+  total_ctes: number;
+  valor_total: number;
+  sql_retorno: string | null;
+  conciliado_por: string | null;
+  conciliado_em: string;
+}
+
 export interface ExtractRow {
   transportadora: string;
   arquivo: string;
@@ -200,6 +213,14 @@ export const api = {
       '/ferramentas/planilhas/sincronizar',
       { method: 'POST', body: JSON.stringify({ file: filename, cteColumn, sigla, titulo }) },
     ),
+
+  getConciliacoes: () => request<ConciliacaoRecord[]>('/ferramentas/planilhas/conciliadas'),
+
+  saveConciliacao: (data: { nome_arquivo: string; sigla: string; titulo: string; coluna_cte: string; total_ctes: number; valor_total: number; sql_retorno?: string }) =>
+    request<{ id: number; conciliado_em: string }>('/ferramentas/planilhas/conciliadas', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   extractPlanilhas: () =>
     request<ExtractRow[]>('/ferramentas/planilhas/extract'),

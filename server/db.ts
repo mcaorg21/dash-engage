@@ -30,6 +30,19 @@ export async function initDb() {
       column_name TEXT        PRIMARY KEY,
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS planilhas_conciliadas (
+      id             SERIAL        PRIMARY KEY,
+      nome_arquivo   TEXT          NOT NULL,
+      sigla          TEXT          NOT NULL,
+      titulo         TEXT          NOT NULL,
+      coluna_cte     TEXT          NOT NULL,
+      total_ctes     INTEGER       NOT NULL,
+      valor_total    NUMERIC(14,2) NOT NULL,
+      sql_retorno    TEXT,
+      conciliado_por TEXT,
+      conciliado_em  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+    );
   `);
   console.log('Database initialized');
 }

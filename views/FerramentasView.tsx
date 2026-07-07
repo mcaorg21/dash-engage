@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle2, ChevronDown, Copy, Download, FileSpreadsheet, Loader2, RefreshCw, Save, Search, Trash2, Upload, X } from 'lucide-react';
-import { api, type BucketFile } from '../utils/api';
+import { api, type BucketFile, type ConciliacaoRecord } from '../utils/api';
 import { useModal } from '../components/useModal';
 import { TRANSPORTADORAS } from '../utils/transportadoras';
 import { downloadCteXmlZip } from '../utils/cteXml';
@@ -157,6 +157,7 @@ const PlanilhasView = () => {
   const [savedValueColumns, setSavedValueColumns] = useState<string[]>([]);
   const [syncingFile, setSyncingFile] = useState<string | null>(null);
   const [syncResults, setSyncResults] = useState<Record<string, { sent: number; valorTotal: number; status: number; sql?: string; retorno?: boolean; valor_diferenca?: number; quantidade_diferenca?: number; ctes_nao_encontradas?: string } | null>>({});
+  const [conciliacoes, setConciliacoes] = useState<ConciliacaoRecord[]>([]);
   const [copiedSql, setCopiedSql] = useState<string | null>(null);
   const [remInfoMap, setRemInfoMap] = useState<Record<string, { remInfo: string | null; json_xml: unknown }>>({});
   const [downloadingZip, setDownloadingZip] = useState<string | null>(null);
@@ -164,7 +165,7 @@ const PlanilhasView = () => {
   const [fileLog, setFileLog] = useState<Record<string, LogEntry[]>>({});
   const [detalhesOpen, setDetalhesOpen] = useState<Record<string, boolean>>({});
   const [editMode, setEditMode] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<'todos' | 'pendente' | 'sucesso' | 'erro'>('pendente');
+  const [activeTab, setActiveTab] = useState<'todos' | 'pendente' | 'sucesso' | 'erro' | 'conciliadas'>('pendente');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -210,6 +211,15 @@ const PlanilhasView = () => {
     }
   }, []);
 
+  const loadConciliacoes = useCallback(async () => {
+    try {
+      const data = await api.getConciliacoes();
+      setConciliacoes(data);
+    } catch {
+      // non-critical
+    }
+  }, []);
+
   const loadFiles = useCallback(async () => {
     setIsLoadingFiles(true);
     setListError(null);
@@ -248,7 +258,8 @@ const PlanilhasView = () => {
     loadFiles();
     loadSavedNames();
     loadSavedValueColumns();
-  }, [loadFiles, loadSavedNames, loadSavedValueColumns]);
+    loadConciliacoes();
+  }, [loadFiles, loadSavedNames, loadSavedValueColumns, loadConciliacoes]);
 
   // Auto-detecta colunas assim que os arquivos são carregados
   useEffect(() => {
@@ -263,7 +274,7 @@ const PlanilhasView = () => {
             { key: 'sigla',    msg: 'Sigla',            value: f.sigla!,        status: 'ok' },
             ...(f.valor_total != null ? [{ key: 'valor', msg: "Valor Total CTe's", value: f.valor_total!.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), status: 'ok' as const }] : []),
           ]}));
-          handleSincronizar(f.name, f.coluna_cte, f.sigla, f.titulo);
+          handleSincronizar(f.name, f.coluna_cte, f.sigla, f.titulo, true);
         } else {
           fetchColumns(f.name);
         }
@@ -459,7 +470,7 @@ const PlanilhasView = () => {
                 setEditTransportadoraTextos(prev => ({ ...prev, [filename]: tituloSync }));
                 upsertLog(filename, { key: 'titulo', msg: 'Título', value: tituloSync, status: 'ok' });
               }
-              if (tituloSync.trim() && tituloSync !== 'NAO_ENCONTRADO') handleSincronizar(filename, autoMatch, sigla, tituloSync);
+              if (tituloSync.trim() && tituloSync !== 'NAO_ENCONTRADO') handleSincronizar(filename, autoMatch, sigla, tituloSync, true);
             } else {
               upsertLog(filename, { key: 'sigla', msg: 'Sigla não detectada automaticamente', status: 'warn' });
               setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
@@ -477,7 +488,7 @@ const PlanilhasView = () => {
             setEditTransportadoraTextos(prev => ({ ...prev, [filename]: tituloSync2 }));
             upsertLog(filename, { key: 'titulo', msg: 'Título', value: tituloSync2, status: 'ok' });
           }
-          if (tituloSync2.trim() && tituloSync2 !== 'NAO_ENCONTRADO') handleSincronizar(filename, autoMatch, editTransportadoras[filename], tituloSync2);
+          if (tituloSync2.trim() && tituloSync2 !== 'NAO_ENCONTRADO') handleSincronizar(filename, autoMatch, editTransportadoras[filename], tituloSync2, true);
         }
       } else {
         const attempt = (cteRetryCount.current[filename] ?? 0) + 1;
@@ -527,7 +538,7 @@ const PlanilhasView = () => {
     }
   };
 
-  const handleSincronizar = async (filename: string, cteColumn: string, sigla: string, titulo: string) => {
+  const handleSincronizar = async (filename: string, cteColumn: string, sigla: string, titulo: string, autoSync = false) => {
     if (sigla === 'PTR') {
       const parts = titulo.split('-');
       titulo = parts[parts.length - 1];
@@ -569,6 +580,23 @@ const PlanilhasView = () => {
         setBucketFiles(prev => prev.map(f => f.name === filename
           ? { ...f, sigla, titulo, coluna_cte: cteColumn, valor_total: result.valorTotal }
           : f));
+        if (!autoSync) {
+          api.saveConciliacao({
+            nome_arquivo: filename,
+            sigla,
+            titulo,
+            coluna_cte: cteColumn,
+            total_ctes: result.sent,
+            valor_total: result.valorTotal,
+            sql_retorno: sql,
+          }).then(({ id, conciliado_em }) => {
+            setConciliacoes(prev => [{
+              id, nome_arquivo: filename, sigla, titulo, coluna_cte: cteColumn,
+              total_ctes: result.sent, valor_total: result.valorTotal,
+              sql_retorno: sql ?? null, conciliado_por: null, conciliado_em,
+            }, ...prev]);
+          }).catch(() => {});
+        }
       } else {
         setDetalhesOpen(prev => ({ ...prev, [filename]: true }));
       }
@@ -748,17 +776,29 @@ const PlanilhasView = () => {
 
         {!isLoadingFiles && !listError && bucketFiles.length > 0 && (() => {
           const q = searchQuery.trim().toLowerCase();
-          const pendentes = bucketFiles.filter(f => !syncResults[f.name]);
-          const sucessos  = bucketFiles.filter(f => syncResults[f.name]?.retorno === true);
-          const erros     = bucketFiles.filter(f => syncResults[f.name]?.retorno === false);
-          const baseList  = activeTab === 'todos' ? bucketFiles : activeTab === 'sucesso' ? sucessos : activeTab === 'erro' ? erros : pendentes;
+          const dbCountFor = (name: string) => conciliacoes.filter(c => c.nome_arquivo === name).length;
+          const pendentes  = bucketFiles.filter(f => !syncResults[f.name]);
+          const sucessos   = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && dbCountFor(f.name) <= 1);
+          const erros      = bucketFiles.filter(f => syncResults[f.name]?.retorno === false);
+          const jaConciliadas = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && dbCountFor(f.name) > 1);
+          const baseList   = activeTab === 'todos' ? bucketFiles
+            : activeTab === 'sucesso' ? sucessos
+            : activeTab === 'erro'    ? erros
+            : activeTab === 'conciliadas' ? jaConciliadas
+            : pendentes;
           const filesToShow = q ? baseList.filter(f => f.name.toLowerCase().includes(q)) : baseList;
           const allVisibleSelected = filesToShow.length > 0 && filesToShow.every(f => selectedFiles.has(f.name));
           return (
           <>
           {/* Abas */}
           <div className="flex items-center gap-0 border-b border-slate-100 px-4">
-            {([['todos', 'Todos', bucketFiles.length], ['pendente', 'Pendente', pendentes.length], ['sucesso', 'Sucesso', sucessos.length], ['erro', 'Erro', erros.length]] as const).map(([key, label, count]) => (
+            {([
+              ['todos',       'Todos',           bucketFiles.length],
+              ['pendente',    'Pendente',         pendentes.length],
+              ['sucesso',     'Sucesso',          sucessos.length],
+              ['erro',        'Erro',             erros.length],
+              ['conciliadas', 'Já Conciliadas',   jaConciliadas.length],
+            ] as const).map(([key, label, count]) => (
               <button key={key} type="button" onClick={() => setActiveTab(key)}
                 className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-semibold transition-colors ${activeTab === key ? 'border-violet-500 text-violet-700' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
                 {label}
@@ -803,6 +843,7 @@ const PlanilhasView = () => {
 
                   const log = fileLog[file.name] ?? [];
                   const tituloWarn = (!transpTitulo.trim() || transpTitulo === 'NAO_ENCONTRADO') && log.some(e => e.key === 'titulo' && e.status === 'warn');
+                  const conciliacaoCount = conciliacoes.filter(c => c.nome_arquivo === file.name).length;
 
                   return (
                     <div key={file.name} className="px-4 py-3 transition-colors hover:bg-slate-50/60">
@@ -818,6 +859,12 @@ const PlanilhasView = () => {
                             <span className="animate-pulse shrink-0 inline-flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600">
                               <AlertCircle size={10} />
                               Salvar título
+                            </span>
+                          )}
+                          {conciliacaoCount > 0 && (
+                            <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-600" title={`Conciliada ${conciliacaoCount}x`}>
+                              <CheckCircle2 size={10} />
+                              {conciliacaoCount > 1 ? `${conciliacaoCount}x conciliada` : 'Conciliada'}
                             </span>
                           )}
                           <button type="button" onClick={() => handleDownload(file)} title="Baixar"
@@ -850,7 +897,7 @@ const PlanilhasView = () => {
                           ) : (
                             <button type="button"
                               onClick={() => handleSincronizar(file.name, colSelected, transpEdit, transpTitulo)}
-                              disabled={!colSelected || !transpEdit.trim() || !transpTitulo.trim() || transpTitulo === 'NAO_ENCONTRADO' || syncingFile === file.name}
+                              disabled={!colSelected || !transpEdit.trim() || !transpTitulo.trim() || syncingFile === file.name}
                               title="Conciliar"
                               className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-40">
                               {syncingFile === file.name ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
@@ -1087,8 +1134,47 @@ const PlanilhasView = () => {
                   );
                 })}
           </div>
-          {filesToShow.length === 0 && (
+          {filesToShow.length === 0 && activeTab !== 'conciliadas' && (
             <div className="p-8 text-center text-sm text-slate-400">Nenhum arquivo nesta aba.</div>
+          )}
+          {activeTab === 'conciliadas' && (
+            <div className="border-t border-slate-100 px-4 py-4">
+              <h3 className="mb-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Histórico de conciliações</h3>
+              {conciliacoes.length === 0 ? (
+                <p className="text-sm text-slate-400 italic">Nenhuma conciliação registrada ainda.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-slate-700">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        <th className="pb-2 pr-4">Arquivo</th>
+                        <th className="pb-2 pr-4">Transportadora</th>
+                        <th className="pb-2 pr-4 text-right">CTe's</th>
+                        <th className="pb-2 pr-4 text-right">Valor Total</th>
+                        <th className="pb-2 pr-4">Data</th>
+                        <th className="pb-2">Usuário</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {conciliacoes.map(r => (
+                        <tr key={r.id} className="hover:bg-slate-50/60">
+                          <td className="py-2 pr-4 max-w-[200px] truncate font-medium" title={r.nome_arquivo}>{r.nome_arquivo}</td>
+                          <td className="py-2 pr-4 text-slate-500">{r.sigla} {r.titulo}</td>
+                          <td className="py-2 pr-4 text-right tabular-nums">{r.total_ctes}</td>
+                          <td className="py-2 pr-4 text-right tabular-nums font-medium text-emerald-700">
+                            {r.valor_total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </td>
+                          <td className="py-2 pr-4 whitespace-nowrap text-slate-400">
+                            {new Date(r.conciliado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="py-2 text-slate-400">{r.conciliado_por ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           )}
           </>
           );
