@@ -176,6 +176,8 @@ function parseSheetCteRows(
       const chave = String(chaveRaw).replace(/^'+/, '').trim();
       // Pula linhas de cabeçalho repetido no meio dos dados
       if (colLower(chave) === colLower(cteColumn)) continue;
+      // Pula chaves com 10 ou menos dígitos — não é uma chave CT-e válida
+      if (chave.replace(/\D/g, '').length <= 10) continue;
 
       let valor: number | null = null;
       if (valIdx !== -1) {
