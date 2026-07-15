@@ -267,7 +267,7 @@ const PlanilhasView = () => {
   useEffect(() => {
     if (bucketFiles.length > 0) {
       bucketFiles.forEach(f => {
-        if (f.coluna_cte && f.sigla && f.titulo) {
+        if (f.coluna_cte && f.sigla && f.sigla !== 'NAO_ENCONTRADA' && f.titulo) {
           // Dados completos em cache — registra log e dispara sync direto
           setFileLog(prev => ({ ...prev, [f.name]: [
             { key: 'planilha', msg: 'Dados em cache', status: 'ok' },
@@ -779,10 +779,11 @@ const PlanilhasView = () => {
         {!isLoadingFiles && !listError && bucketFiles.length > 0 && (() => {
           const q = searchQuery.trim().toLowerCase();
           const snapshotCountFor = (name: string) => initialConciliacoesRef.current.filter(n => n === name).length;
-          const pendentes  = bucketFiles.filter(f => !syncResults[f.name]);
-          const sucessos   = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && snapshotCountFor(f.name) === 0);
-          const erros      = bucketFiles.filter(f => syncResults[f.name]?.retorno === false);
-          const jaConciliadas = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && snapshotCountFor(f.name) > 0);
+          const siglaFor = (f: BucketFile) => (editTransportadoras[f.name] ?? '');
+          const pendentes  = bucketFiles.filter(f => !syncResults[f.name] || siglaFor(f) === 'NAO_ENCONTRADA');
+          const sucessos   = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && snapshotCountFor(f.name) === 0 && siglaFor(f) !== 'NAO_ENCONTRADA');
+          const erros      = bucketFiles.filter(f => syncResults[f.name]?.retorno === false && siglaFor(f) !== 'NAO_ENCONTRADA');
+          const jaConciliadas = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && snapshotCountFor(f.name) > 0 && siglaFor(f) !== 'NAO_ENCONTRADA');
           const baseList   = activeTab === 'todos' ? bucketFiles
             : activeTab === 'sucesso' ? sucessos
             : activeTab === 'erro'    ? erros
