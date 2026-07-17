@@ -156,7 +156,7 @@ const PlanilhasView = () => {
   const [loadingCpSum, setLoadingCpSum] = useState<Record<string, boolean>>({});
   const [savedValueColumns, setSavedValueColumns] = useState<string[]>([]);
   const [syncingFile, setSyncingFile] = useState<string | null>(null);
-  const [syncResults, setSyncResults] = useState<Record<string, { sent: number; valorTotal: number; status: number; sql?: string; retorno?: boolean; valor_diferenca?: number; quantidade_diferenca?: number; ctes_nao_encontradas?: string } | null>>({});
+  const [syncResults, setSyncResults] = useState<Record<string, { sent: number; valorTotal: number; status: number; sql?: string; retorno?: boolean; valor_diferenca?: number; quantidade_diferenca?: number; ctes_nao_encontradas?: string; semEncontroCte?: boolean } | null>>({});
   const [conciliacoes, setConciliacoes] = useState<ConciliacaoRecord[]>([]);
   const [copiedSql, setCopiedSql] = useState<string | null>(null);
   const [remInfoMap, setRemInfoMap] = useState<Record<string, { remInfo: string | null; json_xml: unknown }>>({});
@@ -165,7 +165,7 @@ const PlanilhasView = () => {
   const [fileLog, setFileLog] = useState<Record<string, LogEntry[]>>({});
   const [detalhesOpen, setDetalhesOpen] = useState<Record<string, boolean>>({});
   const [editMode, setEditMode] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<'todos' | 'pendente' | 'sucesso' | 'erro' | 'conciliadas'>('pendente');
+  const [activeTab, setActiveTab] = useState<'todos' | 'pendente' | 'sucesso' | 'erro' | 'conciliadas' | 'outrocnpj'>('pendente');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -556,7 +556,8 @@ const PlanilhasView = () => {
       const valor_diferenca = typeof body?.valor_diferenca === 'number' ? body.valor_diferenca : undefined;
       const quantidade_diferenca = typeof body?.quantidade_diferenca === 'number' ? body.quantidade_diferenca : undefined;
       const ctes_nao_encontradas = typeof body?.ctes_nao_encontradas === 'string' ? body.ctes_nao_encontradas : undefined;
-      setSyncResults(prev => ({ ...prev, [filename]: { sent: result.sent, valorTotal: result.valorTotal, status: result.webhook.status, retorno, sql, valor_diferenca, quantidade_diferenca, ctes_nao_encontradas } }));
+      const semEncontroCte = body?.sigla === 'SEM_ENCONTRO_CTE' || body?.transportadora === 'SEM_ENCONTRO_CTE';
+      setSyncResults(prev => ({ ...prev, [filename]: { sent: result.sent, valorTotal: result.valorTotal, status: result.webhook.status, retorno, sql, valor_diferenca, quantidade_diferenca, ctes_nao_encontradas, semEncontroCte } }));
       if (ctes_nao_encontradas) {
         const chaves = ctes_nao_encontradas.split(',').map(c => c.trim()).filter(Boolean);
         if (chaves.length > 0) {
@@ -780,14 +781,17 @@ const PlanilhasView = () => {
           const q = searchQuery.trim().toLowerCase();
           const snapshotCountFor = (name: string) => initialConciliacoesRef.current.filter(n => n === name).length;
           const siglaFor = (f: BucketFile) => (editTransportadoras[f.name] ?? '');
-          const pendentes  = bucketFiles.filter(f => !syncResults[f.name] || siglaFor(f) === 'NAO_ENCONTRADA');
-          const sucessos   = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && snapshotCountFor(f.name) === 0 && siglaFor(f) !== 'NAO_ENCONTRADA');
-          const erros      = bucketFiles.filter(f => syncResults[f.name]?.retorno === false && siglaFor(f) !== 'NAO_ENCONTRADA');
-          const jaConciliadas = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && snapshotCountFor(f.name) > 0 && siglaFor(f) !== 'NAO_ENCONTRADA');
+          const isSemEncontro = (f: BucketFile) => syncResults[f.name]?.semEncontroCte === true;
+          const pendentes     = bucketFiles.filter(f => !syncResults[f.name] || siglaFor(f) === 'NAO_ENCONTRADA');
+          const sucessos      = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && snapshotCountFor(f.name) === 0 && siglaFor(f) !== 'NAO_ENCONTRADA' && !isSemEncontro(f));
+          const erros         = bucketFiles.filter(f => syncResults[f.name]?.retorno === false && siglaFor(f) !== 'NAO_ENCONTRADA' && !isSemEncontro(f));
+          const jaConciliadas = bucketFiles.filter(f => syncResults[f.name]?.retorno === true && snapshotCountFor(f.name) > 0 && siglaFor(f) !== 'NAO_ENCONTRADA' && !isSemEncontro(f));
+          const outroCnpj     = bucketFiles.filter(f => isSemEncontro(f));
           const baseList   = activeTab === 'todos' ? bucketFiles
-            : activeTab === 'sucesso' ? sucessos
-            : activeTab === 'erro'    ? erros
-            : activeTab === 'conciliadas' ? jaConciliadas
+            : activeTab === 'sucesso'    ? sucessos
+            : activeTab === 'erro'       ? erros
+            : activeTab === 'conciliadas'? jaConciliadas
+            : activeTab === 'outrocnpj'  ? outroCnpj
             : pendentes;
           const filesToShow = q ? baseList.filter(f => f.name.toLowerCase().includes(q)) : baseList;
           const allVisibleSelected = filesToShow.length > 0 && filesToShow.every(f => selectedFiles.has(f.name));
@@ -801,6 +805,7 @@ const PlanilhasView = () => {
               ['sucesso',     'Sucesso',          sucessos.length],
               ['erro',        'Erro',             erros.length],
               ['conciliadas', 'Já Conciliadas',   jaConciliadas.length],
+              ['outrocnpj',  'Faturas Outro CNPJ', outroCnpj.length],
             ] as const).map(([key, label, count]) => (
               <button key={key} type="button" onClick={() => setActiveTab(key)}
                 className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-semibold transition-colors ${activeTab === key ? 'border-violet-500 text-violet-700' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
