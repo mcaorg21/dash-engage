@@ -1147,7 +1147,26 @@ const PlanilhasView = () => {
           )}
           {activeTab === 'conciliadas' && (
             <div className="border-t border-slate-100 px-4 py-4">
-              <h3 className="mb-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Histórico de conciliações</h3>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Histórico de conciliações</h3>
+                {conciliacoes.length > 0 && (
+                  <button type="button"
+                    onClick={async () => {
+                      const ok = await danger('Limpar todo o histórico de conciliações?\n\nEssa ação não pode ser desfeita.', 'Limpar histórico');
+                      if (!ok) return;
+                      try {
+                        await api.clearConciliacoes();
+                        setConciliacoes([]);
+                        initialConciliacoesRef.current = [];
+                      } catch (err: any) {
+                        await alert(err.message || 'Erro ao limpar histórico.', 'Erro');
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100">
+                    <Trash2 size={12} /> Limpar histórico
+                  </button>
+                )}
+              </div>
               {conciliacoes.length === 0 ? (
                 <p className="text-sm text-slate-400 italic">Nenhuma conciliação registrada ainda.</p>
               ) : (

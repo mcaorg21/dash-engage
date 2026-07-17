@@ -222,6 +222,9 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  clearConciliacoes: () =>
+    request<{ deleted: boolean }>('/ferramentas/planilhas/conciliadas', { method: 'DELETE' }),
+
   extractPlanilhas: () =>
     request<ExtractRow[]>('/ferramentas/planilhas/extract'),
 

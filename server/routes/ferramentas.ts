@@ -722,6 +722,16 @@ router.post('/planilhas/conciliadas', async (req: AuthRequest, res) => {
   }
 });
 
+router.delete('/planilhas/conciliadas', async (_req, res) => {
+  try {
+    await pool.query('DELETE FROM planilhas_conciliadas');
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error('DB conciliadas DELETE error:', err);
+    res.status(500).json({ error: 'Erro ao limpar histórico.' });
+  }
+});
+
 router.get('/planilhas/download', async (req: AuthRequest, res) => {
   try {
     const filename = String(req.query.file || '');
