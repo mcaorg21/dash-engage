@@ -556,7 +556,7 @@ const PlanilhasView = () => {
       const valor_diferenca = typeof body?.valor_diferenca === 'number' ? body.valor_diferenca : undefined;
       const quantidade_diferenca = typeof body?.quantidade_diferenca === 'number' ? body.quantidade_diferenca : undefined;
       const ctes_nao_encontradas = typeof body?.ctes_nao_encontradas === 'string' ? body.ctes_nao_encontradas : undefined;
-      const semEncontroCte = body?.sigla === 'SEM_ENCONTRO_CTE' || body?.transportadora === 'SEM_ENCONTRO_CTE';
+      const semEncontroCte = sigla === 'SEM_ENCONTRO_CTE' || body?.sigla === 'SEM_ENCONTRO_CTE' || body?.transportadora === 'SEM_ENCONTRO_CTE';
       setSyncResults(prev => ({ ...prev, [filename]: { sent: result.sent, valorTotal: result.valorTotal, status: result.webhook.status, retorno, sql, valor_diferenca, quantidade_diferenca, ctes_nao_encontradas, semEncontroCte } }));
       if (ctes_nao_encontradas) {
         const chaves = ctes_nao_encontradas.split(',').map(c => c.trim()).filter(Boolean);
