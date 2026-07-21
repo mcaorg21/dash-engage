@@ -1109,6 +1109,8 @@ const NfseListaView = () => {
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data Emissao</th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Razao Social Emitente</th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Tomador</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor Servicos</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tributos</th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nome Arquivo</th>
                     {hasUrl && <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">PDF</th>}
                   </tr>
@@ -1120,6 +1122,13 @@ const NfseListaView = () => {
                       <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_emissao)}</td>
                       <td className="max-w-[240px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.razao_social_emitente)}>{formatCellValue(row.razao_social_emitente)}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.cnpj_tomador)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(row.valor_total_servicos)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">
+                        {formatCurrency(
+                          [row.iss_retido, row.irrf, row.csll, row.pis, row.cofins, row.inss]
+                            .reduce((sum, v) => sum + Number(v || 0), 0)
+                        )}
+                      </td>
                       <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>
                         {row.webviewlink ? (
                           <a href={String(row.webviewlink)} target="_blank" rel="noopener noreferrer"

@@ -69,6 +69,13 @@ export interface NfseRecord {
   cnpj_tomador?: unknown;
   nome_arquivo?: unknown;
   razao_social_emitente?: unknown;
+  valor_total_servicos?: unknown;
+  iss_retido?: unknown;
+  irrf?: unknown;
+  csll?: unknown;
+  pis?: unknown;
+  cofins?: unknown;
+  inss?: unknown;
   webviewlink?: unknown;
   url?: unknown;
   [key: string]: unknown;
