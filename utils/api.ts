@@ -62,6 +62,16 @@ export interface ConciliacaoRecord {
   conciliado_em: string;
 }
 
+export interface NfseRecord {
+  id?: unknown;
+  numero_nota?: unknown;
+  data_emissao?: unknown;
+  cnpj_tomador?: unknown;
+  nome_arquivo?: unknown;
+  url?: unknown;
+  [key: string]: unknown;
+}
+
 export interface ExtractRow {
   transportadora: string;
   arquivo: string;
@@ -224,6 +234,17 @@ export const api = {
 
   clearConciliacoes: () =>
     request<{ deleted: boolean }>('/ferramentas/planilhas/conciliadas', { method: 'DELETE' }),
+
+  getNfseLista: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; cnpjTomador?: string; nomeArquivo?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.numeroNota) params.set('numeroNota', filters.numeroNota);
+    if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
+    if (filters.dataFim) params.set('dataFim', filters.dataFim);
+    if (filters.cnpjTomador) params.set('cnpjTomador', filters.cnpjTomador);
+    if (filters.nomeArquivo) params.set('nomeArquivo', filters.nomeArquivo);
+    const query = params.toString();
+    return request<NfseRecord[]>(`/nfse/lista${query ? `?${query}` : ''}`);
+  },
 
   extractPlanilhas: () =>
     request<ExtractRow[]>('/ferramentas/planilhas/extract'),

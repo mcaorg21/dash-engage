@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import JSZip from 'jszip';
-import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Download, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, RefreshCw, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
+import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Download, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Receipt, RefreshCw, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import PlanilhasView from './FerramentasView';
 import { api } from '../utils/api';
@@ -17,6 +17,10 @@ const qivezTabs = [
 
 const ferramentasTabs = [
   { id: 'ferramentas_planilhas', label: 'Conciliar Planilhas Transp.', icon: FileSpreadsheet },
+];
+
+const nfseTabs = [
+  { id: 'conciliacao_nfse_lista', label: 'Lista', icon: List },
 ];
 
 const qivezTitles: Record<string, { title: string; description: string }> = {
@@ -968,11 +972,156 @@ const QivezCanceladasView = () => {
   );
 };
 
+const NfseListaView = () => {
+  const [rows, setRows] = useState<import('../utils/api').NfseRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [numeroNota, setNumeroNota] = useState('');
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [cnpjTomador, setCnpjTomador] = useState('');
+  const [nomeArquivo, setNomeArquivo] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '' });
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await api.getNfseLista(appliedFilters);
+        if (!cancelled) setRows(data);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Erro ao carregar NFSe.');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [appliedFilters]);
+
+  const clearFilters = () => {
+    setNumeroNota(''); setDataInicio(''); setDataFim(''); setCnpjTomador(''); setNomeArquivo('');
+    setAppliedFilters({ numeroNota: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '' });
+  };
+
+  const hasUrl = rows.length > 0 && rows.some(r => r.url);
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">NFSe - Lista</h1>
+          {!isLoading && !error && (
+            <span className="rounded-full bg-[var(--engage-blue-400)]/15 px-3 py-0.5 text-sm font-bold text-[var(--engage-blue-800)]">
+              {rows.length} {rows.length === 1 ? 'registro' : 'registros'}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-slate-500">Notas fiscais de servico armazenadas no Drive.</p>
+      </div>
+
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-6 py-4">
+          <form
+            className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto] lg:items-end"
+            onSubmit={event => {
+              event.preventDefault();
+              setAppliedFilters({ numeroNota: numeroNota.trim(), dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim() });
+            }}
+          >
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Numero Nota</label>
+              <input type="search" value={numeroNota} onChange={event => setNumeroNota(event.target.value)}
+                placeholder="Buscar numero"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Emissao Inicio</label>
+              <input type="date" value={dataInicio} onChange={event => setDataInicio(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Emissao Fim</label>
+              <input type="date" value={dataFim} onChange={event => setDataFim(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">CNPJ Tomador</label>
+              <input type="search" value={cnpjTomador} onChange={event => setCnpjTomador(event.target.value)}
+                placeholder="Buscar CNPJ"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Nome Arquivo</label>
+              <input type="search" value={nomeArquivo} onChange={event => setNomeArquivo(event.target.value)}
+                placeholder="Buscar arquivo"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
+              Filtrar
+            </button>
+            <button type="button" className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100" onClick={clearFilters}>
+              Limpar
+            </button>
+          </form>
+        </div>
+
+        {isLoading && <div className="p-8 text-sm font-medium text-slate-500">Carregando NFSe...</div>}
+        {error && <div className="p-8 text-sm font-medium text-red-600">{error}</div>}
+        {!isLoading && !error && rows.length === 0 && (
+          <div className="p-8 text-sm font-medium text-slate-500">Nenhuma nota encontrada.</div>
+        )}
+
+        {!isLoading && !error && rows.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-max border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Numero Nota</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data Emissao</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Tomador</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nome Arquivo</th>
+                  {hasUrl && <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">PDF</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {rows.map((row, rowIndex) => (
+                  <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.numero_nota)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_emissao)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.cnpj_tomador)}</td>
+                    <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>{formatCellValue(row.nome_arquivo)}</td>
+                    {hasUrl && (
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        {row.url ? (
+                          <a href={String(row.url)} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20">
+                            <Download size={14} /> PDF
+                          </a>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void }) => {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isQivezOpen, setIsQivezOpen] = useState(() => localStorage.getItem('menuQivezOpen') === 'true');
   const [isFerramentasOpen, setIsFerramentasOpen] = useState(() => localStorage.getItem('menuFerramentasOpen') === 'true');
+  const [isNfseOpen, setIsNfseOpen] = useState(() => localStorage.getItem('menuNfseOpen') === 'true');
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -1015,6 +1164,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
   const hasPermission = (id: string) => isAdmin || userPermissions.includes(id);
   const hasAnyQivezPermission = qivezTabs.some(tab => hasPermission(tab.id));
   const hasAnyFerramentasPermission = ferramentasTabs.some(tab => hasPermission(tab.id));
+  const hasAnyNfsePermission = nfseTabs.some(tab => hasPermission(tab.id));
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -1032,6 +1182,13 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
   const handleFerramentasToggle = () => {
     setIsFerramentasOpen(prev => {
       localStorage.setItem('menuFerramentasOpen', String(!prev));
+      return !prev;
+    });
+  };
+
+  const handleNfseToggle = () => {
+    setIsNfseOpen(prev => {
+      localStorage.setItem('menuNfseOpen', String(!prev));
       return !prev;
     });
   };
@@ -1081,48 +1238,85 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
             <LayoutDashboard size={18} /> Inicio
           </button>
 
-          {hasAnyQivezPermission && (
+          {(hasAnyQivezPermission || hasAnyNfsePermission) && (
             <>
               <div className="px-4 pb-2 pt-5 text-[10px] font-bold uppercase tracking-widest text-white/50">
                 Conciliacao
               </div>
-              <button
-                onClick={handleQivezToggle}
-                className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${qivezTabs.some(tab => tab.id === activeTab) ? 'bg-white/15 text-white ring-1 ring-white/15' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
-              >
-                <span className="flex items-center gap-3">
-                  <FileText size={18} /> CTe
-                  {!isQivezOpen && naoConciliadasCount > 0 && (
-                    <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                      {naoConciliadasCount}
+
+              {hasAnyQivezPermission && (
+                <>
+                  <button
+                    onClick={handleQivezToggle}
+                    className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${qivezTabs.some(tab => tab.id === activeTab) ? 'bg-white/15 text-white ring-1 ring-white/15' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <FileText size={18} /> CTe
+                      {!isQivezOpen && naoConciliadasCount > 0 && (
+                        <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                          {naoConciliadasCount}
+                        </span>
+                      )}
                     </span>
+                    {isQivezOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+
+                  {isQivezOpen && (
+                    <div className="space-y-1 pl-4">
+                      {qivezTabs.map(tab => {
+                        if (!hasPermission(tab.id)) return null;
+                        const Icon = tab.icon;
+
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => handleTabChange(tab.id)}
+                            className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                          >
+                            <Icon size={16} /> {tab.label}
+                            {tab.id === 'conciliacao_qivez_listar' && naoConciliadasCount > 0 && (
+                              <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                                {naoConciliadasCount}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-                </span>
-                {isQivezOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              </button>
+                </>
+              )}
 
-              {isQivezOpen && (
-                <div className="space-y-1 pl-4">
-                  {qivezTabs.map(tab => {
-                    if (!hasPermission(tab.id)) return null;
-                    const Icon = tab.icon;
+              {hasAnyNfsePermission && (
+                <>
+                  <button
+                    onClick={handleNfseToggle}
+                    className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${nfseTabs.some(tab => tab.id === activeTab) ? 'bg-white/15 text-white ring-1 ring-white/15' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Receipt size={18} /> NFSe
+                    </span>
+                    {isNfseOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
 
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => handleTabChange(tab.id)}
-                        className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
-                      >
-                        <Icon size={16} /> {tab.label}
-                        {tab.id === 'conciliacao_qivez_listar' && naoConciliadasCount > 0 && (
-                          <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                            {naoConciliadasCount}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                  {isNfseOpen && (
+                    <div className="space-y-1 pl-4">
+                      {nfseTabs.map(tab => {
+                        if (!hasPermission(tab.id)) return null;
+                        const Icon = tab.icon;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => handleTabChange(tab.id)}
+                            className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                          >
+                            <Icon size={16} /> {tab.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -1235,6 +1429,10 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
 
           {activeTab === 'ferramentas_planilhas' && hasPermission('ferramentas_planilhas') && (
             <PlanilhasView />
+          )}
+
+          {activeTab === 'conciliacao_nfse_lista' && hasPermission('conciliacao_nfse_lista') && (
+            <NfseListaView />
           )}
         </div>
       </main>
