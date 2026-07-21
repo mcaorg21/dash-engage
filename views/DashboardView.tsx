@@ -1051,6 +1051,12 @@ const NfseListaView = () => {
             onSubmit={event => { event.preventDefault(); applyFilters(); }}
           >
             <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Razao Social</label>
+              <input type="search" value={razaoSocialEmitente} onChange={event => setRazaoSocialEmitente(event.target.value)}
+                placeholder="Buscar emitente"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Numero Nota</label>
               <input type="search" value={numeroNota} onChange={event => setNumeroNota(event.target.value)}
                 placeholder="Buscar numero"
@@ -1078,12 +1084,6 @@ const NfseListaView = () => {
                 placeholder="Buscar arquivo"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Razao Social Emitente</label>
-              <input type="search" value={razaoSocialEmitente} onChange={event => setRazaoSocialEmitente(event.target.value)}
-                placeholder="Buscar emitente"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
-            </div>
             <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
               Filtrar
             </button>
@@ -1107,8 +1107,8 @@ const NfseListaView = () => {
                   <tr className="border-b border-slate-100 bg-slate-50">
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Numero Nota</th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data Emissao</th>
-                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Tomador</th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Razao Social Emitente</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Tomador</th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nome Arquivo</th>
                     {hasUrl && <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">PDF</th>}
                   </tr>
@@ -1118,8 +1118,8 @@ const NfseListaView = () => {
                     <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.numero_nota)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_emissao)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.cnpj_tomador)}</td>
                       <td className="max-w-[240px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.razao_social_emitente)}>{formatCellValue(row.razao_social_emitente)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.cnpj_tomador)}</td>
                       <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>
                         {row.webviewlink ? (
                           <a href={String(row.webviewlink)} target="_blank" rel="noopener noreferrer"
