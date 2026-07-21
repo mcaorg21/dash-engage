@@ -972,16 +972,28 @@ const QivezCanceladasView = () => {
   );
 };
 
+const nfseMesAtual = () => {
+  const hoje = new Date();
+  const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return { inicio: fmt(primeiroDia), fim: fmt(hoje) };
+};
+
+const NFSE_PAGE_SIZE = 30;
+
 const NfseListaView = () => {
+  const mesAtual = nfseMesAtual();
   const [rows, setRows] = useState<import('../utils/api').NfseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [numeroNota, setNumeroNota] = useState('');
-  const [dataInicio, setDataInicio] = useState('');
-  const [dataFim, setDataFim] = useState('');
+  const [dataInicio, setDataInicio] = useState(mesAtual.inicio);
+  const [dataFim, setDataFim] = useState(mesAtual.fim);
   const [cnpjTomador, setCnpjTomador] = useState('');
   const [nomeArquivo, setNomeArquivo] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '' });
+  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '' });
+  const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
 
   useEffect(() => {
     let cancelled = false;
@@ -1001,12 +1013,21 @@ const NfseListaView = () => {
     return () => { cancelled = true; };
   }, [appliedFilters]);
 
+  const applyFilters = () => {
+    setDisplayLimit(NFSE_PAGE_SIZE);
+    setAppliedFilters({ numeroNota: numeroNota.trim(), dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim() });
+  };
+
   const clearFilters = () => {
-    setNumeroNota(''); setDataInicio(''); setDataFim(''); setCnpjTomador(''); setNomeArquivo('');
-    setAppliedFilters({ numeroNota: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '' });
+    const mes = nfseMesAtual();
+    setNumeroNota(''); setDataInicio(mes.inicio); setDataFim(mes.fim); setCnpjTomador(''); setNomeArquivo('');
+    setDisplayLimit(NFSE_PAGE_SIZE);
+    setAppliedFilters({ numeroNota: '', dataInicio: mes.inicio, dataFim: mes.fim, cnpjTomador: '', nomeArquivo: '' });
   };
 
   const hasUrl = rows.length > 0 && rows.some(r => r.url);
+  const visibleRows = rows.slice(0, displayLimit);
+  const remaining = rows.length - displayLimit;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -1026,10 +1047,7 @@ const NfseListaView = () => {
         <div className="border-b border-slate-100 px-6 py-4">
           <form
             className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto] lg:items-end"
-            onSubmit={event => {
-              event.preventDefault();
-              setAppliedFilters({ numeroNota: numeroNota.trim(), dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim() });
-            }}
+            onSubmit={event => { event.preventDefault(); applyFilters(); }}
           >
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Numero Nota</label>
@@ -1075,41 +1093,54 @@ const NfseListaView = () => {
         )}
 
         {!isLoading && !error && rows.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-max border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Numero Nota</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data Emissao</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Tomador</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nome Arquivo</th>
-                  {hasUrl && <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">PDF</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {rows.map((row, rowIndex) => (
-                  <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.numero_nota)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_emissao)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.cnpj_tomador)}</td>
-                    <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>{formatCellValue(row.nome_arquivo)}</td>
-                    {hasUrl && (
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        {row.url ? (
-                          <a href={String(row.url)} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20">
-                            <Download size={14} /> PDF
-                          </a>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                    )}
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-max border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Numero Nota</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data Emissao</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Tomador</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nome Arquivo</th>
+                    {hasUrl && <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">PDF</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {visibleRows.map((row, rowIndex) => (
+                    <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.numero_nota)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_emissao)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.cnpj_tomador)}</td>
+                      <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>{formatCellValue(row.nome_arquivo)}</td>
+                      {hasUrl && (
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          {row.url ? (
+                            <a href={String(row.url)} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20">
+                              <Download size={14} /> PDF
+                            </a>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {remaining > 0 && (
+              <div className="border-t border-slate-100 px-6 py-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => setDisplayLimit(prev => prev + NFSE_PAGE_SIZE)}
+                  className="rounded-lg border border-slate-200 px-5 py-2 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Ver mais ({remaining} restante{remaining !== 1 ? 's' : ''})
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
