@@ -992,7 +992,8 @@ const NfseListaView = () => {
   const [dataFim, setDataFim] = useState(mesAtual.fim);
   const [cnpjTomador, setCnpjTomador] = useState('');
   const [nomeArquivo, setNomeArquivo] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '' });
+  const [razaoSocialEmitente, setRazaoSocialEmitente] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '' });
   const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
 
   useEffect(() => {
@@ -1015,14 +1016,14 @@ const NfseListaView = () => {
 
   const applyFilters = () => {
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: numeroNota.trim(), dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim() });
+    setAppliedFilters({ numeroNota: numeroNota.trim(), dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim() });
   };
 
   const clearFilters = () => {
     const mes = nfseMesAtual();
-    setNumeroNota(''); setDataInicio(mes.inicio); setDataFim(mes.fim); setCnpjTomador(''); setNomeArquivo('');
+    setNumeroNota(''); setDataInicio(mes.inicio); setDataFim(mes.fim); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente('');
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: '', dataInicio: mes.inicio, dataFim: mes.fim, cnpjTomador: '', nomeArquivo: '' });
+    setAppliedFilters({ numeroNota: '', dataInicio: mes.inicio, dataFim: mes.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '' });
   };
 
   const hasUrl = rows.length > 0 && rows.some(r => r.url);
@@ -1046,7 +1047,7 @@ const NfseListaView = () => {
       <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-6 py-4">
           <form
-            className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto] lg:items-end"
+            className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto] lg:items-end"
             onSubmit={event => { event.preventDefault(); applyFilters(); }}
           >
             <div>
@@ -1077,6 +1078,12 @@ const NfseListaView = () => {
                 placeholder="Buscar arquivo"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
             </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Razao Social Emitente</label>
+              <input type="search" value={razaoSocialEmitente} onChange={event => setRazaoSocialEmitente(event.target.value)}
+                placeholder="Buscar emitente"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
             <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
               Filtrar
             </button>
@@ -1101,6 +1108,7 @@ const NfseListaView = () => {
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Numero Nota</th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data Emissao</th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Tomador</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Razao Social Emitente</th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nome Arquivo</th>
                     {hasUrl && <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">PDF</th>}
                   </tr>
@@ -1111,6 +1119,7 @@ const NfseListaView = () => {
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.numero_nota)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_emissao)}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.cnpj_tomador)}</td>
+                      <td className="max-w-[240px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.razao_social_emitente)}>{formatCellValue(row.razao_social_emitente)}</td>
                       <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>
                         {row.webviewlink ? (
                           <a href={String(row.webviewlink)} target="_blank" rel="noopener noreferrer"

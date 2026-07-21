@@ -21,7 +21,7 @@ router.get('/lista', async (req: AuthRequest, res) => {
     const allowed = await hasPermission(req, 'conciliacao_nfse_lista');
     if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
 
-    const { numeroNota, dataInicio, dataFim, cnpjTomador, nomeArquivo } = req.query;
+    const { numeroNota, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente } = req.query;
 
     const conditions: string[] = [];
     const values: unknown[] = [];
@@ -46,6 +46,10 @@ router.get('/lista', async (req: AuthRequest, res) => {
     if (nomeArquivo) {
       conditions.push(`nome_arquivo ILIKE $${idx++}`);
       values.push(`%${String(nomeArquivo)}%`);
+    }
+    if (razaoSocialEmitente) {
+      conditions.push(`razao_social_emitente ILIKE $${idx++}`);
+      values.push(`%${String(razaoSocialEmitente)}%`);
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

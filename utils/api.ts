@@ -68,6 +68,7 @@ export interface NfseRecord {
   data_emissao?: unknown;
   cnpj_tomador?: unknown;
   nome_arquivo?: unknown;
+  razao_social_emitente?: unknown;
   webviewlink?: unknown;
   url?: unknown;
   [key: string]: unknown;
@@ -236,13 +237,14 @@ export const api = {
   clearConciliacoes: () =>
     request<{ deleted: boolean }>('/ferramentas/planilhas/conciliadas', { method: 'DELETE' }),
 
-  getNfseLista: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; cnpjTomador?: string; nomeArquivo?: string } = {}) => {
+  getNfseLista: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string } = {}) => {
     const params = new URLSearchParams();
     if (filters.numeroNota) params.set('numeroNota', filters.numeroNota);
     if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
     if (filters.dataFim) params.set('dataFim', filters.dataFim);
     if (filters.cnpjTomador) params.set('cnpjTomador', filters.cnpjTomador);
     if (filters.nomeArquivo) params.set('nomeArquivo', filters.nomeArquivo);
+    if (filters.razaoSocialEmitente) params.set('razaoSocialEmitente', filters.razaoSocialEmitente);
     const query = params.toString();
     return request<NfseRecord[]>(`/nfse/lista${query ? `?${query}` : ''}`);
   },
