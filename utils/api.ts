@@ -68,6 +68,7 @@ export interface NfseRecord {
   data_emissao?: unknown;
   cnpj_tomador?: unknown;
   nome_arquivo?: unknown;
+  webviewlink?: unknown;
   url?: unknown;
   [key: string]: unknown;
 }

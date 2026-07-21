@@ -1111,7 +1111,16 @@ const NfseListaView = () => {
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.numero_nota)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_emissao)}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.cnpj_tomador)}</td>
-                      <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>{formatCellValue(row.nome_arquivo)}</td>
+                      <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>
+                        {row.webviewlink ? (
+                          <a href={String(row.webviewlink)} target="_blank" rel="noopener noreferrer"
+                            className="text-[var(--engage-blue-600)] hover:underline">
+                            {formatCellValue(row.nome_arquivo)}
+                          </a>
+                        ) : (
+                          formatCellValue(row.nome_arquivo)
+                        )}
+                      </td>
                       {hasUrl && (
                         <td className="whitespace-nowrap px-4 py-3 text-right">
                           {row.url ? (
