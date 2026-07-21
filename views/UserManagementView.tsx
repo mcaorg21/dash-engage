@@ -4,11 +4,12 @@ import { api } from '../utils/api';
 import { useModal } from '../components/useModal';
 
 const MENU_ITEMS = [
-  { id: 'conciliacao_qivez_painel', label: 'Painel', group: 'Conciliacao / CTe' },
-  { id: 'conciliacao_qivez_listar', label: 'Listar', group: 'Conciliacao / CTe' },
-  { id: 'conciliacao_qivez_importar', label: 'Importar', group: 'Conciliacao / CTe' },
-  { id: 'ferramentas_planilhas', label: 'Planilhas', group: 'Ferramentas' },
-  { id: 'usuarios', label: 'Controle de Usuarios', group: 'Administracao' },
+  { id: 'conciliacao_qivez_painel',     label: 'Painel',                    group: 'Conciliacao / CTe' },
+  { id: 'conciliacao_qivez_listar',     label: 'Nao Conciliadas',           group: 'Conciliacao / CTe' },
+  { id: 'conciliacao_qivez_canceladas', label: 'Canceladas',                group: 'Conciliacao / CTe' },
+  { id: 'conciliacao_qivez_importar',   label: 'Importar',                  group: 'Conciliacao / CTe' },
+  { id: 'ferramentas_planilhas',        label: 'Planilhas',                 group: 'Ferramentas' },
+  { id: 'usuarios',                     label: 'Controle de Usuarios',      group: 'Administracao' },
 ];
 
 const PROTECTED_EMAILS: string[] = [];

@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../db.js';
 import { authenticate, requireAdmin, type AuthRequest } from '../middleware/auth.js';
 
-const DEFAULT_PERMISSIONS = ['usuarios'];
+const DEFAULT_PERMISSIONS: string[] = [];
 const PROTECTED_EMAILS = (process.env.PROTECTED_ADMIN_EMAILS || '')
   .split(',')
   .map(email => email.trim().toLowerCase())
