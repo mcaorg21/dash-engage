@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import JSZip from 'jszip';
-import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Download, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Receipt, RefreshCw, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
+import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Receipt, RefreshCw, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import PlanilhasView from './FerramentasView';
 import { api } from '../utils/api';
@@ -1114,7 +1114,8 @@ const NfseListaView = () => {
                       <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>
                         {row.webviewlink ? (
                           <a href={String(row.webviewlink)} target="_blank" rel="noopener noreferrer"
-                            className="text-[var(--engage-blue-600)] hover:underline">
+                            className="inline-flex items-center gap-1.5 text-[var(--engage-blue-600)] hover:underline">
+                            <ExternalLink size={13} className="shrink-0" />
                             {formatCellValue(row.nome_arquivo)}
                           </a>
                         ) : (
