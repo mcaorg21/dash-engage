@@ -134,7 +134,20 @@ function parseSheetCteRows(
       dacteIdx = headerRow.findIndex(v => v != null && colLower(String(v).trim()) === DACTE_COL);
     }
 
-    const dataRows = allRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
+    let dataRows = allRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
+
+    // Trunca na última linha que contém uma chave CTE válida (ignora totais/rodapé)
+    let lastCteIdx = -1;
+    for (let i = dataRows.length - 1; i >= 0; i--) {
+      const row = dataRows[i];
+      if (!Array.isArray(row)) continue;
+      const v = (row as unknown[])[cteIdx];
+      if (v == null || v === '') continue;
+      const chave = String(v).replace(/^'+/, '').trim();
+      if (chave.replace(/\D/g, '').length > 10) { lastCteIdx = i; break; }
+    }
+    if (lastCteIdx >= 0) dataRows = dataRows.slice(0, lastCteIdx + 1);
+
     const pairs: { chave: string; valor: number | null }[] = [];
 
     // Usa raw:false (texto formatado pelo Excel) para o valor — garante que formatos com
