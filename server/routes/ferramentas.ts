@@ -136,7 +136,8 @@ function parseSheetCteRows(
 
     let dataRows = allRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
 
-    // Trunca na última linha que contém uma chave CTE válida (ignora totais/rodapé)
+    // Trunca na última linha que contém uma chave CT-e válida (exatamente 44 dígitos)
+    // Isso exclui linhas de totais/rodapé que podem ter valores numéricos grandes mas != 44 dígitos
     let lastCteIdx = -1;
     for (let i = dataRows.length - 1; i >= 0; i--) {
       const row = dataRows[i];
@@ -144,7 +145,7 @@ function parseSheetCteRows(
       const v = (row as unknown[])[cteIdx];
       if (v == null || v === '') continue;
       const chave = String(v).replace(/^'+/, '').trim();
-      if (chave.replace(/\D/g, '').length > 10) { lastCteIdx = i; break; }
+      if (chave.replace(/\D/g, '').length === 44) { lastCteIdx = i; break; }
     }
     if (lastCteIdx >= 0) dataRows = dataRows.slice(0, lastCteIdx + 1);
 
