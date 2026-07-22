@@ -134,21 +134,7 @@ function parseSheetCteRows(
       dacteIdx = headerRow.findIndex(v => v != null && colLower(String(v).trim()) === DACTE_COL);
     }
 
-    let dataRows = allRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
-
-    // Trunca na última linha que contém uma chave CT-e válida (exatamente 44 dígitos)
-    // Isso exclui linhas de totais/rodapé que podem ter valores numéricos grandes mas != 44 dígitos
-    let lastCteIdx = -1;
-    for (let i = dataRows.length - 1; i >= 0; i--) {
-      const row = dataRows[i];
-      if (!Array.isArray(row)) continue;
-      const v = (row as unknown[])[cteIdx];
-      if (v == null || v === '') continue;
-      const chave = String(v).replace(/^'+/, '').trim();
-      if (chave.replace(/\D/g, '').length === 44) { lastCteIdx = i; break; }
-    }
-    if (lastCteIdx >= 0) dataRows = dataRows.slice(0, lastCteIdx + 1);
-
+    const dataRows = allRows.slice(headerRowIdx + 1, skipLastRows > 0 ? -skipLastRows : undefined);
     const pairs: { chave: string; valor: number | null }[] = [];
 
     // Usa raw:false (texto formatado pelo Excel) para o valor — garante que formatos com
