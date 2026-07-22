@@ -596,7 +596,7 @@ router.get('/planilhas/paired-value-sum', async (req: AuthRequest, res) => {
     ).catch(() => ({ rows: [] }));
     const savedValueCols = vcRows.map(r => r.column_name);
     const valueColumns = ['VAL RECEBER', 'Total Servico', 'Total Frete', 'Frete', 'Valor', ...savedValueCols];
-    const ctes = parseSheetCteRows(buffer, cteColumn, valueColumns, 1);
+    const ctes = parseSheetCteRows(buffer, cteColumn, valueColumns, 0);
     const sum = ctes.reduce((s, c) => s + (c.valor ?? 0), 0);
     res.json({ sum: ctes.length > 0 && sum > 0 ? sum : null, count: ctes.length });
   } catch (err) {
@@ -678,7 +678,7 @@ router.post('/planilhas/sincronizar', async (req: AuthRequest, res) => {
     const savedValueCols = vcRows.map(r => r.column_name);
     const valueColumns = ['VAL RECEBER', 'Total Servico', 'Total Frete', 'Frete', 'Valor', ...savedValueCols];
 
-    const ctes = parseSheetCteRows(buffer, cteColumn, valueColumns, valueColumns.some(v => ['Frete', 'Total Frete'].includes(v)) ? 1 : 0);
+    const ctes = parseSheetCteRows(buffer, cteColumn, valueColumns, 0);
     const valorTotal = ctes.reduce((sum, c) => sum + (c.valor ?? 0), 0);
 
     const ctesNormalized = ctes.map(c => ({ ...c, chave: c.chave.replace(/\D/g, '') }));
