@@ -141,13 +141,14 @@ export const api = {
       method: 'DELETE',
     }),
 
-  getQivezLancamentos: (filters: { dataInicio?: string; dataFim?: string; chaveCte?: string; sistema?: string; empresa?: string } = {}) => {
+  getQivezLancamentos: (filters: { dataInicio?: string; dataFim?: string; chaveCte?: string; sistema?: string; municipio?: string; cnpj?: string } = {}) => {
     const params = new URLSearchParams();
     if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
     if (filters.dataFim) params.set('dataFim', filters.dataFim);
     if (filters.chaveCte) params.set('chaveCte', filters.chaveCte);
     if (filters.sistema) params.set('sistema', filters.sistema);
-    if (filters.empresa) params.set('empresa', filters.empresa);
+    if (filters.municipio) params.set('municipio', filters.municipio);
+    if (filters.cnpj) params.set('cnpj', filters.cnpj);
 
     const query = params.toString();
     return request<QivezLancamento[]>(`/qivez/lancamentos${query ? `?${query}` : ''}`);
@@ -155,7 +156,9 @@ export const api = {
 
   getQivezSistemas: () => request<string[]>('/qivez/sistemas'),
 
-  getQivezEmpresas: () => request<string[]>('/qivez/empresas'),
+  getQivezMunicipios: () => request<string[]>('/qivez/municipios'),
+
+  getQivezCnpjs: () => request<string[]>('/qivez/cnpjs'),
 
   getQivezCanceladas: (filters: { dataInicio?: string; dataFim?: string; chaveCte?: string; sistema?: string } = {}) => {
     const params = new URLSearchParams();

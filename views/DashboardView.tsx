@@ -575,14 +575,17 @@ const QivezListarView = () => {
   const [dataFim, setDataFim] = useState('');
   const [chaveCte, setChaveCte] = useState('');
   const [sistema, setSistema] = useState('');
-  const [empresa, setEmpresa] = useState('');
+  const [municipio, setMunicipio] = useState('');
+  const [cnpj, setCnpj] = useState('');
   const [sistemas, setSistemas] = useState<string[]>([]);
-  const [empresas, setEmpresas] = useState<string[]>([]);
-  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '', empresa: '' });
+  const [municipios, setMunicipios] = useState<string[]>([]);
+  const [cnpjs, setCnpjs] = useState<string[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '', municipio: '', cnpj: '' });
 
   useEffect(() => {
     api.getQivezSistemas().then(setSistemas).catch(() => {});
-    api.getQivezEmpresas().then(values => setEmpresas(normalizeEmpresaOptions(values))).catch(() => {});
+    api.getQivezMunicipios().then(values => setMunicipios(normalizeEmpresaOptions(values))).catch(() => {});
+    api.getQivezCnpjs().then(setCnpjs).catch(() => {});
   }, []);
 
   const getCurrentFilters = () => ({
@@ -590,7 +593,8 @@ const QivezListarView = () => {
     dataFim,
     chaveCte: chaveCte.trim(),
     sistema: sistema.trim(),
-    empresa: empresa.trim(),
+    municipio: municipio.trim(),
+    cnpj: cnpj.trim(),
   });
 
   useEffect(() => {
@@ -637,7 +641,7 @@ const QivezListarView = () => {
         <div className="border-b border-slate-100 px-6 py-4">
           <div className="w-full">
             <form
-              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto_auto] lg:items-end"
+              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto_auto] lg:items-end"
               onSubmit={event => {
                 event.preventDefault();
                 setAppliedFilters(getCurrentFilters());
@@ -675,14 +679,28 @@ const QivezListarView = () => {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Empresa</label>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Município</label>
                 <select
-                  value={empresa}
-                  onChange={event => setEmpresa(event.target.value)}
+                  value={municipio}
+                  onChange={event => setMunicipio(event.target.value)}
                   className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
                 >
                   <option value="">Todos</option>
-                  {empresas.map(item => (
+                  {municipios.map(item => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">CNPJ Tomador</label>
+                <select
+                  value={cnpj}
+                  onChange={event => setCnpj(event.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                >
+                  <option value="">Todos</option>
+                  {cnpjs.map(item => (
                     <option key={item} value={item}>{item}</option>
                   ))}
                 </select>
@@ -700,8 +718,9 @@ const QivezListarView = () => {
                   setDataFim('');
                   setChaveCte('');
                   setSistema('');
-                  setEmpresa('');
-                  setAppliedFilters({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '', empresa: '' });
+                  setMunicipio('');
+                  setCnpj('');
+                  setAppliedFilters({ dataInicio: '', dataFim: '', chaveCte: '', sistema: '', municipio: '', cnpj: '' });
                 }}
               >
                 Limpar

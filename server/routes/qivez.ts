@@ -128,7 +128,7 @@ router.get('/sistemas', async (req: AuthRequest, res) => {
   }
 });
 
-const remetenteEmpresaSql = `
+const municipioSql = `
   COALESCE(
     json_xml::jsonb #>> '{ctePrc,CTe,infCte,rem,enderReme,xMun}',
     json_xml::jsonb #>> '{cteProc,CTe,infCte,rem,enderReme,xMun}',
@@ -136,23 +136,51 @@ const remetenteEmpresaSql = `
   )
 `;
 
-router.get('/empresas', async (req: AuthRequest, res) => {
+const cnpjTomadorSql = `
+  COALESCE(
+    json_xml::jsonb #>> '{ctePrc,CTe,infCte,dest,CNPJ}',
+    json_xml::jsonb #>> '{cteProc,CTe,infCte,dest,CNPJ}',
+    json_xml::jsonb #>> '{CTe,infCte,dest,CNPJ}'
+  )
+`;
+
+router.get('/municipios', async (req: AuthRequest, res) => {
   try {
     const allowed = await hasPermission(req, 'conciliacao_qivez_listar');
     if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
 
     const result = await pool.query(`
-      SELECT INITCAP(MIN(BTRIM(${remetenteEmpresaSql}))) AS empresa
+      SELECT INITCAP(MIN(BTRIM(${municipioSql}))) AS municipio
       FROM public.lancamentos_financeiros
       WHERE cancelada = false
         AND (existe_qives_sysemp = false OR existe_sysemp_qives = false)
-        AND NULLIF(BTRIM(${remetenteEmpresaSql}), '') IS NOT NULL
-      GROUP BY LOWER(BTRIM(${remetenteEmpresaSql}))
-      ORDER BY empresa
+        AND NULLIF(BTRIM(${municipioSql}), '') IS NOT NULL
+      GROUP BY LOWER(BTRIM(${municipioSql}))
+      ORDER BY municipio
     `);
-    res.json(result.rows.map((r: { empresa: string }) => r.empresa));
+    res.json(result.rows.map((r: { municipio: string }) => r.municipio));
   } catch (err) {
-    console.error('Qivez empresas error:', err);
+    console.error('Qivez municipios error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+router.get('/cnpjs', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_qivez_listar');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const result = await pool.query(`
+      SELECT DISTINCT BTRIM(${cnpjTomadorSql}) AS cnpj
+      FROM public.lancamentos_financeiros
+      WHERE cancelada = false
+        AND (existe_qives_sysemp = false OR existe_sysemp_qives = false)
+        AND NULLIF(BTRIM(${cnpjTomadorSql}), '') IS NOT NULL
+      ORDER BY cnpj
+    `);
+    res.json(result.rows.map((r: { cnpj: string }) => r.cnpj));
+  } catch (err) {
+    console.error('Qivez cnpjs error:', err);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -183,7 +211,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
       return;
     }
 
-    const { dataInicio, dataFim, chaveCte, sistema, empresa } = req.query;
+    const { dataInicio, dataFim, chaveCte, sistema, municipio, cnpj } = req.query;
     const filters = ['cancelada = false', '(existe_qives_sysemp = false OR existe_sysemp_qives = false)'];
     const values: string[] = [];
 
@@ -207,9 +235,14 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
       filters.push(`sistema ILIKE $${values.length}`);
     }
 
-    if (typeof empresa === 'string' && empresa.trim()) {
-      values.push(`%${empresa.trim()}%`);
-      filters.push(`${remetenteEmpresaSql} ILIKE $${values.length}`);
+    if (typeof municipio === 'string' && municipio.trim()) {
+      values.push(`%${municipio.trim()}%`);
+      filters.push(`${municipioSql} ILIKE $${values.length}`);
+    }
+
+    if (typeof cnpj === 'string' && cnpj.trim()) {
+      values.push(`%${cnpj.trim()}%`);
+      filters.push(`${cnpjTomadorSql} ILIKE $${values.length}`);
     }
 
     const result = await pool.query(`
@@ -219,7 +252,8 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
         chave_cte,
         tipo,
         sistema::text AS sistema,
-        ${remetenteEmpresaSql} AS empresa,
+        ${municipioSql} AS municipio,
+        ${cnpjTomadorSql} AS cnpj_tomador,
         diferenca_valor AS valor,
         json_xml
       FROM public.lancamentos_financeiros
