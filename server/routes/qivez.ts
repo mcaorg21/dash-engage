@@ -138,9 +138,9 @@ const municipioSql = `
 
 const cnpjTomadorSql = `
   COALESCE(
-    json_xml::jsonb #>> '{ctePrc,CTe,infCte,dest,CNPJ}',
-    json_xml::jsonb #>> '{cteProc,CTe,infCte,dest,CNPJ}',
-    json_xml::jsonb #>> '{CTe,infCte,dest,CNPJ}'
+    json_xml::jsonb #>> '{ctePrc,CTe,infCte,rem,CNPJ}',
+    json_xml::jsonb #>> '{cteProc,CTe,infCte,rem,CNPJ}',
+    json_xml::jsonb #>> '{CTe,infCte,rem,CNPJ}'
   )
 `;
 
