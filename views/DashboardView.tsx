@@ -1012,8 +1012,13 @@ const NfseListaView = () => {
   const [cnpjTomador, setCnpjTomador] = useState('');
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [razaoSocialEmitente, setRazaoSocialEmitente] = useState('');
+  const [cnpjTomadors, setCnpjTomadors] = useState<string[]>([]);
   const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '' });
   const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
+
+  useEffect(() => {
+    api.getNfseCnpjs().then(values => setCnpjTomadors([...values].sort())).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1093,9 +1098,13 @@ const NfseListaView = () => {
             </div>
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">CNPJ Tomador</label>
-              <input type="search" value={cnpjTomador} onChange={event => setCnpjTomador(event.target.value)}
-                placeholder="Buscar CNPJ"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+              <select value={cnpjTomador} onChange={event => setCnpjTomador(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20">
+                <option value="">Todos</option>
+                {cnpjTomadors.map(item => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Nome Arquivo</label>

@@ -16,6 +16,24 @@ async function hasPermission(req: AuthRequest, permission: string) {
 
 router.use(authenticate);
 
+router.get('/cnpjs', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_nfse_lista');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const result = await pool.query(`
+      SELECT DISTINCT cnpj_tomador
+      FROM controle_arquivos_drive
+      WHERE cnpj_tomador IS NOT NULL AND BTRIM(cnpj_tomador) <> ''
+      ORDER BY cnpj_tomador
+    `);
+    res.json(result.rows.map((r: { cnpj_tomador: string }) => r.cnpj_tomador));
+  } catch (err) {
+    console.error('NFSe cnpjs error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 router.get('/lista', async (req: AuthRequest, res) => {
   try {
     const allowed = await hasPermission(req, 'conciliacao_nfse_lista');

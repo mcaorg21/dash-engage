@@ -247,6 +247,8 @@ export const api = {
   clearConciliacoes: () =>
     request<{ deleted: boolean }>('/ferramentas/planilhas/conciliadas', { method: 'DELETE' }),
 
+  getNfseCnpjs: () => request<string[]>('/nfse/cnpjs'),
+
   getNfseLista: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string } = {}) => {
     const params = new URLSearchParams();
     if (filters.numeroNota) params.set('numeroNota', filters.numeroNota);
