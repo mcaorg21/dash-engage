@@ -585,7 +585,7 @@ const QivezListarView = () => {
   useEffect(() => {
     api.getQivezSistemas().then(setSistemas).catch(() => {});
     api.getQivezMunicipios().then(values => setMunicipios(normalizeEmpresaOptions(values))).catch(() => {});
-    api.getQivezCnpjs().then(setCnpjs).catch(() => {});
+    api.getQivezCnpjs().then(values => setCnpjs([...values].sort())).catch(() => {});
   }, []);
 
   const getCurrentFilters = () => ({
