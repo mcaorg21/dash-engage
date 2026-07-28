@@ -547,6 +547,24 @@ const SistemaBadge = ({ value }: { value: unknown }) => {
   );
 };
 
+const CNPJ_LABELS: Record<string, string> = {
+  '24867555000101': 'MG [24.867.555/0001-01] ENGAGE ELETRO COMERCIO S.A. - MATRIZ',
+  '24867555000284': 'ES [24.867.555/0002-84] ENGAGE ELETRO COMERCIO S.A. - VAREJO',
+  '24867555000365': 'ES [24.867.555/0003-65] ENGAGE ELETRO COMERCIO S.A. - ATACADO',
+  '24867555000527': 'ES [24.867.555/0005-27] ENGAGE ELETRO COMERCIO S.A. - LOG',
+  '24867555000608': 'ES [24.867.555/0006-08] ENGAGE ELETRO LOJA OUTLET',
+  '24867555000799': 'SP [24.867.555/0007-99] ENGAGE ELETRO COMERCIO S.A. - SP',
+  '24867555000870': 'MG [24.867.555/0008-70] ENGAGE ELETRO COMERCIO S.A. - EXTREMA',
+};
+
+const formatCnpj = (raw: string) => {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length !== 14) return raw;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12, 14)}`;
+};
+
+const cnpjOptionLabel = (raw: string) => CNPJ_LABELS[raw.replace(/\D/g, '')] ?? formatCnpj(raw);
+
 const normalizeEmpresaOptions = (values: string[]) => {
   const map = new Map<string, string>();
 
@@ -701,7 +719,7 @@ const QivezListarView = () => {
                 >
                   <option value="">Todos</option>
                   {cnpjs.map(item => (
-                    <option key={item} value={item}>{item}</option>
+                    <option key={item} value={item}>{cnpjOptionLabel(item)}</option>
                   ))}
                 </select>
               </div>
@@ -1102,7 +1120,7 @@ const NfseListaView = () => {
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20">
                 <option value="">Todos</option>
                 {cnpjTomadors.map(item => (
-                  <option key={item} value={item}>{item}</option>
+                  <option key={item} value={item}>{cnpjOptionLabel(item)}</option>
                 ))}
               </select>
             </div>
