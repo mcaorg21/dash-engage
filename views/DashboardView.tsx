@@ -1031,7 +1031,7 @@ const NfseListaView = () => {
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [razaoSocialEmitente, setRazaoSocialEmitente] = useState('');
   const [cnpjTomadors, setCnpjTomadors] = useState<string[]>([]);
-  const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv'>('xlsx');
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '' });
   const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
 
@@ -1073,7 +1073,8 @@ const NfseListaView = () => {
   const visibleRows = rows.slice(0, displayLimit);
   const remaining = rows.length - displayLimit;
 
-  const exportNfse = async () => {
+  const exportNfse = async (exportFormat: 'xlsx' | 'csv') => {
+    setShowExportMenu(false);
     const roundMoney = (value: unknown) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
     const exportRows = rows.map(row => {
       const totalTributos = roundMoney(
@@ -1153,24 +1154,44 @@ const NfseListaView = () => {
           </div>
           <p className="mt-1 text-sm text-slate-500">Notas fiscais de servico armazenadas no Drive.</p>
         </div>
-        <div className="flex w-full gap-2 sm:w-auto">
-          <select
-            value={exportFormat}
-            onChange={event => setExportFormat(event.target.value as 'xlsx' | 'csv')}
-            aria-label="Formato da exportacao"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
-          >
-            <option value="xlsx">XLSX</option>
-            <option value="csv">CSV</option>
-          </select>
+        <div className="relative w-full sm:w-auto">
           <button
             type="button"
             disabled={isLoading || rows.length === 0}
-            onClick={exportNfse}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:border-emerald-500 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-300 sm:flex-none"
+            onClick={() => setShowExportMenu(current => !current)}
+            aria-expanded={showExportMenu}
+            aria-haspopup="menu"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:border-emerald-500 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-300 sm:w-auto"
           >
-            <FileSpreadsheet size={16} /> Baixar dados
+            <FileSpreadsheet size={16} />
+            Baixar dados
+            <ChevronDown size={15} className={`transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
           </button>
+          {showExportMenu && (
+            <div
+              role="menu"
+              className="absolute right-0 z-20 mt-2 w-full min-w-44 overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-lg sm:w-44"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => exportNfse('xlsx')}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+              >
+                <FileSpreadsheet size={16} className="text-emerald-600" />
+                Planilha XLSX
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => exportNfse('csv')}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+              >
+                <FileText size={16} className="text-emerald-600" />
+                Arquivo CSV
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
