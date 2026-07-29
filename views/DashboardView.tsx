@@ -1031,6 +1031,7 @@ const NfseListaView = () => {
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [razaoSocialEmitente, setRazaoSocialEmitente] = useState('');
   const [cnpjTomadors, setCnpjTomadors] = useState<string[]>([]);
+  const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv'>('xlsx');
   const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '' });
   const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
 
@@ -1072,18 +1073,105 @@ const NfseListaView = () => {
   const visibleRows = rows.slice(0, displayLimit);
   const remaining = rows.length - displayLimit;
 
+  const exportNfse = async () => {
+    const roundMoney = (value: unknown) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+    const exportRows = rows.map(row => {
+      const totalTributos = roundMoney(
+        [row.iss_retido, row.irrf, row.csll, row.pis, row.cofins, row.inss]
+          .reduce((sum, value) => sum + Number(value || 0), 0)
+      );
+      const valorServicos = roundMoney(row.valor_total_servicos);
+
+      return {
+        'Numero da Nota': String(row.numero_nota ?? ''),
+        'Emitente Nome': String(row.razao_social_emitente ?? ''),
+        'Emitente CNPJ': String(row.cnpj_emitente ?? ''),
+        'Valor Servicos': valorServicos,
+        'ISS Retido': roundMoney(row.iss_retido),
+        IRRF: roundMoney(row.irrf),
+        CSLL: roundMoney(row.csll),
+        PIS: roundMoney(row.pis),
+        COFINS: roundMoney(row.cofins),
+        INSS: roundMoney(row.inss),
+        'Total Tributos': totalTributos,
+        'Valor Liquido': roundMoney(valorServicos - totalTributos),
+        'Nome Arquivo': String(row.nome_arquivo ?? ''),
+        'Link Arquivo': String(row.webviewlink || row.url || ''),
+        'CNPJ Tomador': String(row.cnpj_tomador ?? ''),
+      };
+    });
+
+    const date = new Date().toISOString().slice(0, 10);
+    if (exportFormat === 'csv') {
+      const headers = Object.keys(exportRows[0] || {});
+      const moneyHeaders = new Set(['Valor Servicos', 'ISS Retido', 'IRRF', 'CSLL', 'PIS', 'COFINS', 'INSS', 'Total Tributos', 'Valor Liquido']);
+      const escapeCsv = (value: unknown) => `"${String(value).replace(/"/g, '""')}"`;
+      const lines = [
+        headers.map(escapeCsv).join(';'),
+        ...exportRows.map(item => headers.map(header => (
+          moneyHeaders.has(header)
+            ? Number(item[header as keyof typeof item]).toFixed(2).replace('.', ',')
+            : escapeCsv(item[header as keyof typeof item])
+        )).join(';')),
+      ];
+      const blob = new Blob([`\uFEFF${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `nfse-${date}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const XLSX = await import('xlsx');
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const moneyColumns = [3, 4, 5, 6, 7, 8, 9, 10, 11];
+    moneyColumns.forEach(column => {
+      for (let row = 1; row <= exportRows.length; row += 1) {
+        const cell = worksheet[XLSX.utils.encode_cell({ r: row, c: column })];
+        if (cell) cell.z = '0.00';
+      }
+    });
+    worksheet['!cols'] = [16, 32, 20, ...Array(9).fill(15), 35, 45, 20].map(wch => ({ wch }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'NFSe');
+    XLSX.writeFile(workbook, `nfse-${date}.xlsx`);
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div>
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">NFSe - Lista</h1>
-          {!isLoading && !error && (
-            <span className="rounded-full bg-[var(--engage-blue-400)]/15 px-3 py-0.5 text-sm font-bold text-[var(--engage-blue-800)]">
-              {rows.length} {rows.length === 1 ? 'registro' : 'registros'}
-            </span>
-          )}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">NFSe - Lista</h1>
+            {!isLoading && !error && (
+              <span className="rounded-full bg-[var(--engage-blue-400)]/15 px-3 py-0.5 text-sm font-bold text-[var(--engage-blue-800)]">
+                {rows.length} {rows.length === 1 ? 'registro' : 'registros'}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-sm text-slate-500">Notas fiscais de servico armazenadas no Drive.</p>
         </div>
-        <p className="mt-1 text-sm text-slate-500">Notas fiscais de servico armazenadas no Drive.</p>
+        <div className="flex w-full gap-2 sm:w-auto">
+          <select
+            value={exportFormat}
+            onChange={event => setExportFormat(event.target.value as 'xlsx' | 'csv')}
+            aria-label="Formato da exportacao"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+          >
+            <option value="xlsx">XLSX</option>
+            <option value="csv">CSV</option>
+          </select>
+          <button
+            type="button"
+            disabled={isLoading || rows.length === 0}
+            onClick={exportNfse}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:border-emerald-500 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-300 sm:flex-none"
+          >
+            <FileSpreadsheet size={16} /> Baixar dados
+          </button>
+        </div>
       </div>
 
       <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
@@ -1151,29 +1239,54 @@ const NfseListaView = () => {
               <table className="w-full min-w-max border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Numero Nota</th>
-                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data Emissao</th>
-                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Razao Social Emitente</th>
-                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Tomador</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Emissao / Nota</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Emitente</th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor Servicos</th>
-                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tributos</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Detalhamento dos Tributos</th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nome Arquivo</th>
                     {hasUrl && <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">PDF</th>}
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor Liquido</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {visibleRows.map((row, rowIndex) => (
                     <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.numero_nota)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_emissao)}</td>
-                      <td className="max-w-[240px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.razao_social_emitente)}>{formatCellValue(row.razao_social_emitente)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.cnpj_tomador)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="text-slate-700">{formatDatePt(row.data_emissao)}</div>
+                        <div className="mt-1 font-mono text-xs text-slate-500">Nota {formatCellValue(row.numero_nota)}</div>
+                      </td>
+                      <td className="max-w-[280px] px-4 py-3">
+                        <div className="truncate text-slate-700" title={formatCellValue(row.razao_social_emitente)}>
+                          {formatCellValue(row.razao_social_emitente)}
+                        </div>
+                        <div className="mt-1 whitespace-nowrap font-mono text-xs text-slate-500">
+                          {formatCellValue(row.cnpj_emitente)}
+                        </div>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(row.valor_total_servicos)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">
-                        {formatCurrency(
-                          [row.iss_retido, row.irrf, row.csll, row.pis, row.cofins, row.inss]
-                            .reduce((sum, v) => sum + Number(v || 0), 0)
-                        )}
+                      <td className="whitespace-nowrap px-4 py-3 text-xs">
+                        <div className="grid grid-cols-[auto_auto] gap-x-3 gap-y-1">
+                          {[
+                            ['ISS Retido', row.iss_retido],
+                            ['IRRF', row.irrf],
+                            ['CSLL', row.csll],
+                            ['PIS', row.pis],
+                            ['COFINS', row.cofins],
+                            ['INSS', row.inss],
+                          ].map(([label, value]) => (
+                            <React.Fragment key={String(label)}>
+                              <span className="font-bold text-slate-500">{String(label)}</span>
+                              <span className="text-right font-medium text-slate-700">{formatCurrency(value)}</span>
+                            </React.Fragment>
+                          ))}
+                          <span className="mt-1 border-t border-slate-200 pt-1 font-bold text-slate-700">Total</span>
+                          <span className="mt-1 border-t border-slate-200 pt-1 text-right font-bold text-slate-800">
+                            {formatCurrency(
+                              [row.iss_retido, row.irrf, row.csll, row.pis, row.cofins, row.inss]
+                                .reduce((sum, v) => sum + Number(v || 0), 0)
+                            )}
+                          </span>
+                        </div>
                       </td>
                       <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>
                         {row.webviewlink ? (
@@ -1198,6 +1311,13 @@ const NfseListaView = () => {
                           )}
                         </td>
                       )}
+                      <td className="whitespace-nowrap px-4 py-3 font-bold text-slate-800">
+                        {formatCurrency(
+                          Number(row.valor_total_servicos || 0)
+                          - [row.iss_retido, row.irrf, row.csll, row.pis, row.cofins, row.inss]
+                            .reduce((sum, v) => sum + Number(v || 0), 0)
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

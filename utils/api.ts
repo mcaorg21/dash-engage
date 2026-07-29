@@ -67,6 +67,7 @@ export interface NfseRecord {
   numero_nota?: unknown;
   data_emissao?: unknown;
   cnpj_tomador?: unknown;
+  cnpj_emitente?: unknown;
   nome_arquivo?: unknown;
   razao_social_emitente?: unknown;
   valor_total_servicos?: unknown;
