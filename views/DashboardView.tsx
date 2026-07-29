@@ -1250,7 +1250,10 @@ const NfseListaView = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {visibleRows.map((row, rowIndex) => (
-                    <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
+                    <tr
+                      key={String(row.id ?? rowIndex)}
+                      className={`${rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-100/70'} transition-colors hover:bg-slate-200/70`}
+                    >
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="text-slate-700">{formatDatePt(row.data_emissao)}</div>
                         <div className="mt-1 font-mono text-xs text-slate-500">Nota {formatCellValue(row.numero_nota)}</div>
