@@ -89,4 +89,31 @@ router.get('/lista', async (req: AuthRequest, res) => {
   }
 });
 
+router.patch('/:id/valor-liquido', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_nfse_lista');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const id = Number(req.params.id);
+    const valorLiquido = Number(req.body?.valorLiquido);
+    if (!Number.isFinite(id) || !Number.isFinite(valorLiquido)) {
+      res.status(400).json({ error: 'Dados invalidos' });
+      return;
+    }
+
+    const result = await pool.query(
+      'UPDATE controle_arquivos_drive SET valor_liquido = $1 WHERE id = $2 RETURNING valor_liquido',
+      [valorLiquido, id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Registro nao encontrado' });
+      return;
+    }
+    res.json({ valor_liquido: result.rows[0].valor_liquido });
+  } catch (err) {
+    console.error('NFSe valor liquido update error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 export default router;

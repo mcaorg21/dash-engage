@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Receipt, RefreshCw, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import PlanilhasView from './FerramentasView';
-import { api } from '../utils/api';
+import { api, type NfseRecord } from '../utils/api';
 import { getXmlContent, getRemInfo, downloadTextFile } from '../utils/cteXml';
 
 const INTERNAL_LOGO_SRC = '/logo/white-logo.7e189ed.webp';
@@ -468,6 +468,8 @@ const formatCurrency = (value: unknown) => {
     maximumFractionDigits: 2,
   });
 };
+
+const roundMoney = (value: unknown) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
 const formatChaveCteComRem = (row: Record<string, unknown>) => {
   const chave = formatCellValue(row.chave_cte);
@@ -1019,9 +1021,91 @@ const nfseMesAtual = () => {
 
 const NFSE_PAGE_SIZE = 30;
 
+const computeValorLiquidoNfse = (row: NfseRecord) => {
+  const totalTributos = [row.iss_retido, row.irrf, row.csll, row.pis, row.cofins, row.inss]
+    .reduce<number>((sum, value) => sum + Number(value || 0), 0);
+  return roundMoney(Number(row.valor_total_servicos || 0) - totalTributos);
+};
+
+const resolveValorLiquido = (row: NfseRecord) => {
+  const stored = row.valor_liquido;
+  return stored !== null && stored !== undefined && stored !== ''
+    ? roundMoney(stored)
+    : computeValorLiquidoNfse(row);
+};
+
+const ValorLiquidoInput = ({ row, onSaved }: { row: NfseRecord; onSaved: (id: unknown, value: number) => void }) => {
+  const rowId = row.id;
+  const initialValue = resolveValorLiquido(row);
+  const [value, setValue] = useState(() => initialValue.toFixed(2));
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+
+  useEffect(() => {
+    setValue(initialValue.toFixed(2));
+    setStatus('idle');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowId]);
+
+  useEffect(() => {
+    if (status !== 'saved') return;
+    const timer = setTimeout(() => setStatus('idle'), 2500);
+    return () => clearTimeout(timer);
+  }, [status]);
+
+  const handleBlur = async () => {
+    const parsed = Number(value.replace(',', '.'));
+    if (!Number.isFinite(parsed)) {
+      setValue(initialValue.toFixed(2));
+      return;
+    }
+    const rounded = roundMoney(parsed);
+    setValue(rounded.toFixed(2));
+    if (Math.abs(rounded - initialValue) < 0.001) return;
+
+    setSaving(true);
+    setStatus('idle');
+    try {
+      await api.updateNfseValorLiquido(row.id as string | number, rounded);
+      onSaved(row.id, rounded);
+      setStatus('saved');
+    } catch {
+      setStatus('error');
+      setValue(initialValue.toFixed(2));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="relative inline-block">
+      <input
+        type="number"
+        step="0.01"
+        value={value}
+        onChange={event => setValue(event.target.value)}
+        onBlur={handleBlur}
+        disabled={saving}
+        className={`w-28 rounded-lg border px-2 py-1.5 text-right text-sm font-bold outline-none transition-colors focus:ring-2 focus:ring-[var(--engage-blue-400)]/20 ${
+          status === 'error'
+            ? 'border-red-300 bg-red-50 text-red-700'
+            : status === 'saved'
+            ? 'border-green-300 bg-green-50 text-slate-800'
+            : 'border-slate-200 bg-white text-slate-800 focus:border-[var(--engage-blue-400)]'
+        }`}
+      />
+      {status === 'saved' && (
+        <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded-full border border-green-200 bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700 shadow-sm">
+          Salvo com sucesso
+        </span>
+      )}
+    </div>
+  );
+};
+
 const NfseListaView = () => {
   const mesAtual = nfseMesAtual();
-  const [rows, setRows] = useState<import('../utils/api').NfseRecord[]>([]);
+  const [rows, setRows] = useState<NfseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [numeroNota, setNumeroNota] = useState('');
@@ -1075,7 +1159,6 @@ const NfseListaView = () => {
 
   const exportNfse = async (exportFormat: 'xlsx' | 'csv') => {
     setShowExportMenu(false);
-    const roundMoney = (value: unknown) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
     const exportRows = rows.map(row => {
       const totalTributos = roundMoney(
         [row.iss_retido, row.irrf, row.csll, row.pis, row.cofins, row.inss]
@@ -1095,7 +1178,7 @@ const NfseListaView = () => {
         COFINS: roundMoney(row.cofins),
         INSS: roundMoney(row.inss),
         'Total Tributos': totalTributos,
-        'Valor Liquido': roundMoney(valorServicos - totalTributos),
+        'Valor Liquido': resolveValorLiquido(row),
         'Nome Arquivo': String(row.nome_arquivo ?? ''),
         'Link Arquivo': String(row.webviewlink || row.url || ''),
         'CNPJ Tomador': String(row.cnpj_tomador ?? ''),
@@ -1335,12 +1418,13 @@ const NfseListaView = () => {
                           )}
                         </td>
                       )}
-                      <td className="whitespace-nowrap px-4 py-3 font-bold text-slate-800">
-                        {formatCurrency(
-                          Number(row.valor_total_servicos || 0)
-                          - [row.iss_retido, row.irrf, row.csll, row.pis, row.cofins, row.inss]
-                            .reduce((sum, v) => sum + Number(v || 0), 0)
-                        )}
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <ValorLiquidoInput
+                          row={row}
+                          onSaved={(id, value) => {
+                            setRows(prev => prev.map(item => (item.id === id ? { ...item, valor_liquido: value } : item)));
+                          }}
+                        />
                       </td>
                     </tr>
                   ))}

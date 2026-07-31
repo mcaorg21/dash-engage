@@ -262,6 +262,12 @@ export const api = {
     return request<NfseRecord[]>(`/nfse/lista${query ? `?${query}` : ''}`);
   },
 
+  updateNfseValorLiquido: (id: number | string, valorLiquido: number) =>
+    request<{ valor_liquido: number }>(`/nfse/${id}/valor-liquido`, {
+      method: 'PATCH',
+      body: JSON.stringify({ valorLiquido }),
+    }),
+
   extractPlanilhas: () =>
     request<ExtractRow[]>('/ferramentas/planilhas/extract'),
 
