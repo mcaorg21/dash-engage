@@ -39,7 +39,9 @@ router.get('/lista', async (req: AuthRequest, res) => {
     const allowed = await hasPermission(req, 'conciliacao_nfse_lista');
     if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
 
-    const { numeroNota, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente } = req.query;
+    const { numeroNota, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente, campoData, cancelada } = req.query;
+
+    const campoDataColuna = campoData === 'competencia' ? 'competencia_servico' : 'data_emissao';
 
     const conditions: string[] = [];
     const values: unknown[] = [];
@@ -50,11 +52,11 @@ router.get('/lista', async (req: AuthRequest, res) => {
       values.push(`%${String(numeroNota)}%`);
     }
     if (dataInicio) {
-      conditions.push(`data_emissao >= $${idx++}`);
+      conditions.push(`${campoDataColuna} >= $${idx++}`);
       values.push(String(dataInicio));
     }
     if (dataFim) {
-      conditions.push(`data_emissao <= $${idx++}`);
+      conditions.push(`${campoDataColuna} <= $${idx++}`);
       values.push(String(dataFim));
     }
     if (cnpjTomador) {
@@ -68,6 +70,11 @@ router.get('/lista', async (req: AuthRequest, res) => {
     if (razaoSocialEmitente) {
       conditions.push(`razao_social_emitente ILIKE $${idx++}`);
       values.push(`%${String(razaoSocialEmitente)}%`);
+    }
+    if (cancelada === 'true') {
+      conditions.push(`cancelada = true`);
+    } else if (cancelada === 'false') {
+      conditions.push(`cancelada IS NOT TRUE`);
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

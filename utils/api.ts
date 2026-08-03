@@ -66,6 +66,8 @@ export interface NfseRecord {
   id?: unknown;
   numero_nota?: unknown;
   data_emissao?: unknown;
+  competencia_servico?: unknown;
+  cancelada?: unknown;
   cnpj_tomador?: unknown;
   cnpj_emitente?: unknown;
   nome_arquivo?: unknown;
@@ -250,14 +252,16 @@ export const api = {
 
   getNfseCnpjs: () => request<string[]>('/nfse/cnpjs'),
 
-  getNfseLista: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string } = {}) => {
+  getNfseLista: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; campoData?: 'emissao' | 'competencia'; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; cancelada?: '' | 'true' | 'false' } = {}) => {
     const params = new URLSearchParams();
     if (filters.numeroNota) params.set('numeroNota', filters.numeroNota);
     if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
     if (filters.dataFim) params.set('dataFim', filters.dataFim);
+    if (filters.campoData) params.set('campoData', filters.campoData);
     if (filters.cnpjTomador) params.set('cnpjTomador', filters.cnpjTomador);
     if (filters.nomeArquivo) params.set('nomeArquivo', filters.nomeArquivo);
     if (filters.razaoSocialEmitente) params.set('razaoSocialEmitente', filters.razaoSocialEmitente);
+    if (filters.cancelada) params.set('cancelada', filters.cancelada);
     const query = params.toString();
     return request<NfseRecord[]>(`/nfse/lista${query ? `?${query}` : ''}`);
   },

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import JSZip from 'jszip';
-import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Receipt, RefreshCw, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
+import { AlertCircle, BarChart3, Calendar, CalendarClock, ChevronDown, ChevronRight, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Receipt, RefreshCw, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import PlanilhasView from './FerramentasView';
 import { api, type NfseRecord } from '../utils/api';
@@ -1109,14 +1109,16 @@ const NfseListaView = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [numeroNota, setNumeroNota] = useState('');
+  const [campoData, setCampoData] = useState<'emissao' | 'competencia'>('emissao');
   const [dataInicio, setDataInicio] = useState(mesAtual.inicio);
   const [dataFim, setDataFim] = useState(mesAtual.fim);
   const [cnpjTomador, setCnpjTomador] = useState('');
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [razaoSocialEmitente, setRazaoSocialEmitente] = useState('');
+  const [cancelada, setCancelada] = useState<'' | 'true' | 'false'>('');
   const [cnpjTomadors, setCnpjTomadors] = useState<string[]>([]);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '' });
+  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', campoData: 'emissao' as 'emissao' | 'competencia', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '' as '' | 'true' | 'false' });
   const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
 
   useEffect(() => {
@@ -1143,14 +1145,14 @@ const NfseListaView = () => {
 
   const applyFilters = () => {
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: numeroNota.trim(), dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim() });
+    setAppliedFilters({ numeroNota: numeroNota.trim(), campoData, dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), cancelada });
   };
 
   const clearFilters = () => {
     const mes = nfseMesAtual();
-    setNumeroNota(''); setDataInicio(mes.inicio); setDataFim(mes.fim); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente('');
+    setNumeroNota(''); setCampoData('emissao'); setDataInicio(mes.inicio); setDataFim(mes.fim); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCancelada('');
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: '', dataInicio: mes.inicio, dataFim: mes.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '' });
+    setAppliedFilters({ numeroNota: '', campoData: 'emissao', dataInicio: mes.inicio, dataFim: mes.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '' });
   };
 
   const hasUrl = rows.length > 0 && rows.some(r => r.url);
@@ -1168,6 +1170,8 @@ const NfseListaView = () => {
 
       return {
         'Numero da Nota': String(row.numero_nota ?? ''),
+        'Emissao': formatDatePt(row.data_emissao),
+        'Competencia': formatDatePt(row.competencia_servico),
         'Emitente Nome': String(row.razao_social_emitente ?? ''),
         'Emitente CNPJ': String(row.cnpj_emitente ?? ''),
         'Valor Servicos': valorServicos,
@@ -1210,14 +1214,14 @@ const NfseListaView = () => {
 
     const XLSX = await import('xlsx');
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
-    const moneyColumns = [3, 4, 5, 6, 7, 8, 9, 10, 11];
+    const moneyColumns = [5, 6, 7, 8, 9, 10, 11, 12, 13];
     moneyColumns.forEach(column => {
       for (let row = 1; row <= exportRows.length; row += 1) {
         const cell = worksheet[XLSX.utils.encode_cell({ r: row, c: column })];
         if (cell) cell.z = '0.00';
       }
     });
-    worksheet['!cols'] = [16, 32, 20, ...Array(9).fill(15), 35, 45, 20].map(wch => ({ wch }));
+    worksheet['!cols'] = [16, 14, 14, 32, 20, ...Array(9).fill(15), 35, 45, 20].map(wch => ({ wch }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'NFSe');
     XLSX.writeFile(workbook, `nfse-${date}.xlsx`);
@@ -1281,7 +1285,7 @@ const NfseListaView = () => {
       <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-6 py-4">
           <form
-            className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto] lg:items-end"
+            className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(140px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_minmax(140px,0.8fr)_auto_auto] lg:items-end"
             onSubmit={event => { event.preventDefault(); applyFilters(); }}
           >
             <div>
@@ -1297,12 +1301,20 @@ const NfseListaView = () => {
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Emissao Inicio</label>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Filtrar por</label>
+              <select value={campoData} onChange={event => setCampoData(event.target.value as 'emissao' | 'competencia')}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20">
+                <option value="emissao">Emissao</option>
+                <option value="competencia">Competencia</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Data Inicio</label>
               <input type="date" value={dataInicio} onChange={event => setDataInicio(event.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Emissao Fim</label>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Data Fim</label>
               <input type="date" value={dataFim} onChange={event => setDataFim(event.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
             </div>
@@ -1321,6 +1333,15 @@ const NfseListaView = () => {
               <input type="search" value={nomeArquivo} onChange={event => setNomeArquivo(event.target.value)}
                 placeholder="Buscar arquivo"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Cancelada</label>
+              <select value={cancelada} onChange={event => setCancelada(event.target.value as '' | 'true' | 'false')}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20">
+                <option value="">Todas</option>
+                <option value="true">Sim</option>
+                <option value="false">Nao</option>
+              </select>
             </div>
             <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
               Filtrar
@@ -1359,8 +1380,21 @@ const NfseListaView = () => {
                       className={`${rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-100/70'} transition-colors hover:bg-slate-200/70`}
                     >
                       <td className="whitespace-nowrap px-4 py-3">
-                        <div className="text-slate-700">{formatDatePt(row.data_emissao)}</div>
+                        <div className="flex items-center gap-1.5 text-slate-700" title="Emissao">
+                          <Calendar size={13} className="shrink-0 text-slate-400" />
+                          {formatDatePt(row.data_emissao)}
+                        </div>
+                        <div className="mt-1 flex items-center gap-1.5 text-slate-500" title="Competencia">
+                          <CalendarClock size={13} className="shrink-0 text-slate-400" />
+                          {formatDatePt(row.competencia_servico)}
+                        </div>
                         <div className="mt-1 font-mono text-xs text-slate-500">Nota {formatCellValue(row.numero_nota)}</div>
+                        {row.cancelada === true && (
+                          <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">
+                            <XCircle size={11} className="shrink-0" />
+                            Cancelada
+                          </span>
+                        )}
                       </td>
                       <td className="max-w-[280px] px-4 py-3">
                         <div className="truncate text-slate-700" title={formatCellValue(row.razao_social_emitente)}>
