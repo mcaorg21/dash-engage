@@ -34,12 +34,30 @@ router.get('/cnpjs', async (req: AuthRequest, res) => {
   }
 });
 
+router.get('/canais-venda', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_nfse_lista');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const result = await pool.query(`
+      SELECT DISTINCT canal_de_venda
+      FROM controle_arquivos_drive
+      WHERE canal_de_venda IS NOT NULL AND BTRIM(canal_de_venda) <> ''
+      ORDER BY canal_de_venda
+    `);
+    res.json(result.rows.map((r: { canal_de_venda: string }) => r.canal_de_venda));
+  } catch (err) {
+    console.error('NFSe canais de venda error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 router.get('/lista', async (req: AuthRequest, res) => {
   try {
     const allowed = await hasPermission(req, 'conciliacao_nfse_lista');
     if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
 
-    const { numeroNota, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente, campoData, cancelada } = req.query;
+    const { numeroNota, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente, campoData, cancelada, canalVenda } = req.query;
 
     const campoDataColuna = campoData === 'competencia' ? 'competencia_servico' : 'data_emissao';
 
@@ -75,6 +93,10 @@ router.get('/lista', async (req: AuthRequest, res) => {
       conditions.push(`cancelada = true`);
     } else if (cancelada === 'false') {
       conditions.push(`cancelada IS NOT TRUE`);
+    }
+    if (canalVenda) {
+      conditions.push(`canal_de_venda = $${idx++}`);
+      values.push(String(canalVenda));
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

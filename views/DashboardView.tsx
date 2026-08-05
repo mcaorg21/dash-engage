@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import JSZip from 'jszip';
-import { AlertCircle, BarChart3, Calendar, CalendarClock, ChevronDown, ChevronRight, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Receipt, RefreshCw, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
+import { AlertCircle, BarChart3, Calendar, CalendarClock, ChevronDown, ChevronRight, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Receipt, RefreshCw, Tag, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import PlanilhasView from './FerramentasView';
 import { api, type NfseRecord } from '../utils/api';
@@ -1116,13 +1116,16 @@ const NfseListaView = () => {
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [razaoSocialEmitente, setRazaoSocialEmitente] = useState('');
   const [cancelada, setCancelada] = useState<'' | 'true' | 'false'>('');
+  const [canalVenda, setCanalVenda] = useState('');
   const [cnpjTomadors, setCnpjTomadors] = useState<string[]>([]);
+  const [canaisVenda, setCanaisVenda] = useState<string[]>([]);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', campoData: 'emissao' as 'emissao' | 'competencia', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '' as '' | 'true' | 'false' });
+  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', campoData: 'emissao' as 'emissao' | 'competencia', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '' as '' | 'true' | 'false', canalVenda: '' });
   const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
 
   useEffect(() => {
     api.getNfseCnpjs().then(values => setCnpjTomadors([...values].sort())).catch(() => {});
+    api.getNfseCanaisVenda().then(values => setCanaisVenda([...values].sort())).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1145,14 +1148,14 @@ const NfseListaView = () => {
 
   const applyFilters = () => {
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: numeroNota.trim(), campoData, dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), cancelada });
+    setAppliedFilters({ numeroNota: numeroNota.trim(), campoData, dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), cancelada, canalVenda });
   };
 
   const clearFilters = () => {
     const mes = nfseMesAtual();
-    setNumeroNota(''); setCampoData('emissao'); setDataInicio(mes.inicio); setDataFim(mes.fim); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCancelada('');
+    setNumeroNota(''); setCampoData('emissao'); setDataInicio(mes.inicio); setDataFim(mes.fim); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCancelada(''); setCanalVenda('');
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: '', campoData: 'emissao', dataInicio: mes.inicio, dataFim: mes.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '' });
+    setAppliedFilters({ numeroNota: '', campoData: 'emissao', dataInicio: mes.inicio, dataFim: mes.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '', canalVenda: '' });
   };
 
   const hasUrl = rows.length > 0 && rows.some(r => r.url);
@@ -1285,7 +1288,7 @@ const NfseListaView = () => {
       <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-6 py-4">
           <form
-            className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(140px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_minmax(140px,0.8fr)_auto_auto] lg:items-end"
+            className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 lg:items-end"
             onSubmit={event => { event.preventDefault(); applyFilters(); }}
           >
             <div>
@@ -1343,12 +1346,24 @@ const NfseListaView = () => {
                 <option value="false">Nao</option>
               </select>
             </div>
-            <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
-              Filtrar
-            </button>
-            <button type="button" className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100" onClick={clearFilters}>
-              Limpar
-            </button>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Canal de Venda</label>
+              <select value={canalVenda} onChange={event => setCanalVenda(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20">
+                <option value="">Todos</option>
+                {canaisVenda.map(item => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
+                Filtrar
+              </button>
+              <button type="button" className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100" onClick={clearFilters}>
+                Limpar
+              </button>
+            </div>
           </form>
         </div>
 
@@ -1397,6 +1412,12 @@ const NfseListaView = () => {
                         )}
                       </td>
                       <td className="max-w-[280px] px-4 py-3">
+                        {typeof row.canal_de_venda === 'string' && row.canal_de_venda.trim() !== '' && (
+                          <span className="mb-1 inline-flex items-center gap-1 rounded-full border border-[var(--engage-blue-400)]/30 bg-[var(--engage-blue-400)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--engage-blue-800)]">
+                            <Tag size={11} className="shrink-0" />
+                            {row.canal_de_venda}
+                          </span>
+                        )}
                         <div className="truncate text-slate-700" title={formatCellValue(row.razao_social_emitente)}>
                           {formatCellValue(row.razao_social_emitente)}
                         </div>

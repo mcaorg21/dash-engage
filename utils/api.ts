@@ -68,6 +68,7 @@ export interface NfseRecord {
   data_emissao?: unknown;
   competencia_servico?: unknown;
   cancelada?: unknown;
+  canal_de_venda?: unknown;
   cnpj_tomador?: unknown;
   cnpj_emitente?: unknown;
   nome_arquivo?: unknown;
@@ -252,7 +253,7 @@ export const api = {
 
   getNfseCnpjs: () => request<string[]>('/nfse/cnpjs'),
 
-  getNfseLista: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; campoData?: 'emissao' | 'competencia'; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; cancelada?: '' | 'true' | 'false' } = {}) => {
+  getNfseLista: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; campoData?: 'emissao' | 'competencia'; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; cancelada?: '' | 'true' | 'false'; canalVenda?: string } = {}) => {
     const params = new URLSearchParams();
     if (filters.numeroNota) params.set('numeroNota', filters.numeroNota);
     if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
@@ -262,9 +263,12 @@ export const api = {
     if (filters.nomeArquivo) params.set('nomeArquivo', filters.nomeArquivo);
     if (filters.razaoSocialEmitente) params.set('razaoSocialEmitente', filters.razaoSocialEmitente);
     if (filters.cancelada) params.set('cancelada', filters.cancelada);
+    if (filters.canalVenda) params.set('canalVenda', filters.canalVenda);
     const query = params.toString();
     return request<NfseRecord[]>(`/nfse/lista${query ? `?${query}` : ''}`);
   },
+
+  getNfseCanaisVenda: () => request<string[]>('/nfse/canais-venda'),
 
   updateNfseValorLiquido: (id: number | string, valorLiquido: number) =>
     request<{ valor_liquido: number }>(`/nfse/${id}/valor-liquido`, {
