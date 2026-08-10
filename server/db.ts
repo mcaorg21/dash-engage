@@ -67,6 +67,28 @@ export async function initDb() {
       END IF;
     END $$;
 
+    CREATE OR REPLACE FUNCTION fn_regra_bate(
+      p_razao_social TEXT,
+      p_uf_emitente TEXT,
+      p_endereco_tomador TEXT,
+      p_fornecedor_pattern TEXT,
+      p_uf_emitente_pattern TEXT,
+      p_endereco_tomador_pattern TEXT,
+      p_padrao_pessoa_fisica BOOLEAN
+    ) RETURNS BOOLEAN AS $BODY$
+    BEGIN
+      RETURN
+        (p_fornecedor_pattern IS NULL OR p_fornecedor_pattern = '' OR p_razao_social ~* (
+          (CASE WHEN left(p_fornecedor_pattern, 1) ~ '[[:alnum:]_]' THEN '\\m' ELSE '' END)
+          || p_fornecedor_pattern ||
+          (CASE WHEN right(p_fornecedor_pattern, 1) ~ '[[:alnum:]_]' THEN '\\M' ELSE '' END)
+        ))
+        AND (p_uf_emitente_pattern IS NULL OR p_uf_emitente_pattern = '' OR p_uf_emitente ILIKE ('%' || p_uf_emitente_pattern || '%'))
+        AND (p_endereco_tomador_pattern IS NULL OR p_endereco_tomador_pattern = '' OR p_endereco_tomador ILIKE ('%' || p_endereco_tomador_pattern || '%'))
+        AND (p_padrao_pessoa_fisica = FALSE OR p_razao_social ~ '[0-9]{6,}\\s*$');
+    END;
+    $BODY$ LANGUAGE plpgsql IMMUTABLE;
+
     CREATE OR REPLACE FUNCTION fn_classificar_tipo_servico(
       p_razao_social TEXT,
       p_uf_emitente TEXT,
@@ -78,14 +100,7 @@ export async function initDb() {
       SELECT m.tipo_servico INTO v_tipo
       FROM mapeamento_tipo_servico m
       WHERE m.ativo = TRUE
-        AND (m.fornecedor_pattern IS NULL OR m.fornecedor_pattern = '' OR p_razao_social ~* (
-          (CASE WHEN left(m.fornecedor_pattern, 1) ~ '[[:alnum:]_]' THEN '\\m' ELSE '' END)
-          || m.fornecedor_pattern ||
-          (CASE WHEN right(m.fornecedor_pattern, 1) ~ '[[:alnum:]_]' THEN '\\M' ELSE '' END)
-        ))
-        AND (m.uf_emitente_pattern IS NULL OR m.uf_emitente_pattern = '' OR p_uf_emitente ILIKE ('%' || m.uf_emitente_pattern || '%'))
-        AND (m.endereco_tomador_pattern IS NULL OR m.endereco_tomador_pattern = '' OR p_endereco_tomador ILIKE ('%' || m.endereco_tomador_pattern || '%'))
-        AND (m.padrao_pessoa_fisica = FALSE OR p_razao_social ~ '[0-9]{6,}\\s*$')
+        AND fn_regra_bate(p_razao_social, p_uf_emitente, p_endereco_tomador, m.fornecedor_pattern, m.uf_emitente_pattern, m.endereco_tomador_pattern, m.padrao_pessoa_fisica)
       ORDER BY m.prioridade ASC, m.id ASC
       LIMIT 1;
 

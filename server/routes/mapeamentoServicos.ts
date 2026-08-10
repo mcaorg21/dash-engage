@@ -38,9 +38,14 @@ router.get('/', async (req: AuthRequest, res) => {
     const allowed = await hasPermission(req, 'ferramentas_mapeamento_servicos');
     if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
 
-    const result = await pool.query(
-      'SELECT * FROM mapeamento_tipo_servico ORDER BY prioridade ASC, id ASC'
-    );
+    const result = await pool.query(`
+      SELECT m.*, (
+        SELECT COUNT(*)::int FROM controle_arquivos_drive c
+        WHERE fn_regra_bate(c.razao_social_emitente, c.cidade_uf_emitente, c.endereco_tomador, m.fornecedor_pattern, m.uf_emitente_pattern, m.endereco_tomador_pattern, m.padrao_pessoa_fisica)
+      ) AS total_notas
+      FROM mapeamento_tipo_servico m
+      ORDER BY m.prioridade ASC, m.id ASC
+    `);
     res.json(result.rows);
   } catch (err) {
     console.error('Mapeamento servicos lista error:', err);

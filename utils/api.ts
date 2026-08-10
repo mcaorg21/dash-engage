@@ -118,6 +118,7 @@ export interface MapeamentoTipoServico {
   observacao: string | null;
   criado_em: string;
   atualizado_em: string;
+  total_notas: number;
 }
 
 export interface MapeamentoTipoServicoInput {

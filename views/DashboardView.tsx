@@ -1030,7 +1030,7 @@ const TIPO_SERVICO_BADGE_CLASS: Record<string, string> = {
   Telecom: 'border-purple-200 bg-purple-100 text-purple-700',
   Terceirizado: 'border-amber-200 bg-amber-100 text-amber-700',
   Marketplace: 'border-emerald-200 bg-emerald-100 text-emerald-700',
-  'Demais Servicos': 'border-slate-200 bg-slate-100 text-slate-600',
+  'Demais Servicos': 'border-orange-200 bg-orange-100 text-orange-700',
 };
 
 const computeValorLiquidoNfse = (row: NfseRecord) => {

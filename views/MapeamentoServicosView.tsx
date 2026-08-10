@@ -10,7 +10,7 @@ const TIPO_BADGE_CLASS: Record<string, string> = {
   Telecom: 'bg-purple-100 text-purple-700 border-purple-200',
   Terceirizado: 'bg-amber-100 text-amber-700 border-amber-200',
   Marketplace: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  'Demais Servicos': 'bg-slate-100 text-slate-600 border-slate-200',
+  'Demais Servicos': 'bg-orange-100 text-orange-700 border-orange-200',
   'Nao classificado': 'bg-red-50 text-red-600 border-red-200',
 };
 
@@ -38,6 +38,7 @@ const MapeamentoServicosView = () => {
   const [isReclassifying, setIsReclassifying] = useState(false);
   const [filtroFornecedor, setFiltroFornecedor] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
+  const [mostrarSemNotas, setMostrarSemNotas] = useState(false);
   const { modal, alert: showAlert, danger } = useModal();
 
   const loadRegras = async () => {
@@ -181,8 +182,10 @@ const MapeamentoServicosView = () => {
   const regrasFiltradas = regras.filter(regra => {
     const matchFornecedor = !filtroFornecedor.trim() || (regra.fornecedor_pattern || '').toLowerCase().includes(filtroFornecedor.trim().toLowerCase());
     const matchTipo = !filtroTipo || regra.tipo_servico === filtroTipo;
-    return matchFornecedor && matchTipo;
+    const matchNotas = mostrarSemNotas || regra.total_notas > 0;
+    return matchFornecedor && matchTipo && matchNotas;
   });
+  const regrasSemNotasOcultas = regras.length - regras.filter(r => r.total_notas > 0).length;
 
   if (isLoading) {
     return (
@@ -260,6 +263,15 @@ const MapeamentoServicosView = () => {
             {TIPOS_SERVICO.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
           </select>
         </div>
+        <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm font-medium text-slate-600">
+          <input
+            type="checkbox"
+            checked={mostrarSemNotas}
+            onChange={event => setMostrarSemNotas(event.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-[var(--engage-blue-600)] focus:ring-[var(--engage-blue-400)]"
+          />
+          Mostrar sem notas {regrasSemNotasOcultas > 0 && !mostrarSemNotas && `(${regrasSemNotasOcultas})`}
+        </label>
       </div>
 
       <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
