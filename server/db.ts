@@ -16,6 +16,8 @@ export const pool = new Pool({
 });
 
 export async function initDb() {
+  await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       email         VARCHAR(255) PRIMARY KEY,
@@ -76,7 +78,11 @@ export async function initDb() {
       SELECT m.tipo_servico INTO v_tipo
       FROM mapeamento_tipo_servico m
       WHERE m.ativo = TRUE
-        AND (m.fornecedor_pattern IS NULL OR m.fornecedor_pattern = '' OR p_razao_social ~* ('\\m' || m.fornecedor_pattern || '\\M'))
+        AND (m.fornecedor_pattern IS NULL OR m.fornecedor_pattern = '' OR p_razao_social ~* (
+          (CASE WHEN left(m.fornecedor_pattern, 1) ~ '[[:alnum:]_]' THEN '\\m' ELSE '' END)
+          || m.fornecedor_pattern ||
+          (CASE WHEN right(m.fornecedor_pattern, 1) ~ '[[:alnum:]_]' THEN '\\M' ELSE '' END)
+        ))
         AND (m.uf_emitente_pattern IS NULL OR m.uf_emitente_pattern = '' OR p_uf_emitente ILIKE ('%' || m.uf_emitente_pattern || '%'))
         AND (m.endereco_tomador_pattern IS NULL OR m.endereco_tomador_pattern = '' OR p_endereco_tomador ILIKE ('%' || m.endereco_tomador_pattern || '%'))
         AND (m.padrao_pessoa_fisica = FALSE OR p_razao_social ~ '[0-9]{6,}\\s*$')

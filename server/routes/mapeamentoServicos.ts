@@ -5,6 +5,21 @@ import { authenticate, type AuthRequest } from '../middleware/auth.js';
 const router = Router();
 
 const TIPOS_SERVICO = ['Transporte', 'Telecom', 'Terceirizado', 'Marketplace', 'Demais Servicos'];
+const SIMILARIDADE_MINIMA = 0.6;
+
+async function findFornecedorSimilar(fornecedorPattern: string, excludeId?: number) {
+  const result = await pool.query(
+    `SELECT id, fornecedor_pattern, tipo_servico, similarity(lower(fornecedor_pattern), lower($1)) AS sim
+     FROM mapeamento_tipo_servico
+     WHERE fornecedor_pattern IS NOT NULL
+       AND ($2::int IS NULL OR id != $2)
+       AND similarity(lower(fornecedor_pattern), lower($1)) >= ${SIMILARIDADE_MINIMA}
+     ORDER BY sim DESC
+     LIMIT 1`,
+    [fornecedorPattern, excludeId ?? null]
+  );
+  return result.rows[0] as { id: number; fornecedor_pattern: string; tipo_servico: string; sim: number } | undefined;
+}
 
 async function hasPermission(req: AuthRequest, permission: string) {
   if (req.isAdmin) return true;
@@ -83,6 +98,15 @@ router.post('/', async (req: AuthRequest, res) => {
       res.status(400).json({ error: 'Informe ao menos um criterio de match' });
       return;
     }
+    if (fornecedorPattern) {
+      const similar = await findFornecedorSimilar(fornecedorPattern);
+      if (similar) {
+        res.status(400).json({
+          error: `Fornecedor muito parecido com a regra existente "${similar.fornecedor_pattern}" (${similar.tipo_servico}, ${Math.round(similar.sim * 100)}% de similaridade). Edite a regra existente em vez de criar uma nova.`,
+        });
+        return;
+      }
+    }
 
     const result = await pool.query(
       `INSERT INTO mapeamento_tipo_servico (tipo_servico, fornecedor_pattern, uf_emitente_pattern, endereco_tomador_pattern, padrao_pessoa_fisica, prioridade, ativo, observacao)
@@ -122,6 +146,15 @@ router.put('/:id', async (req: AuthRequest, res) => {
     if (!padraoPessoaFisica && !fornecedorPattern && !ufEmitentePattern && !enderecoTomadorPattern) {
       res.status(400).json({ error: 'Informe ao menos um criterio de match' });
       return;
+    }
+    if (fornecedorPattern) {
+      const similar = await findFornecedorSimilar(fornecedorPattern, id);
+      if (similar) {
+        res.status(400).json({
+          error: `Fornecedor muito parecido com a regra existente "${similar.fornecedor_pattern}" (${similar.tipo_servico}, ${Math.round(similar.sim * 100)}% de similaridade). Edite a regra existente em vez de criar uma nova.`,
+        });
+        return;
+      }
     }
 
     const result = await pool.query(
