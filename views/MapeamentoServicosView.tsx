@@ -309,17 +309,15 @@ const MapeamentoServicosView = () => {
         )}
         {!error && regras.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-max border-collapse text-left text-sm">
+            <table className="w-full table-fixed border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tipo</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Fornecedor</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">UF Emitente</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Endereco Tomador</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">PF + Numero</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Prioridade</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Ativo</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Acoes</th>
+                  <th className="w-28 whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tipo</th>
+                  <th className="w-56 whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Fornecedor</th>
+                  <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Criterios adicionais</th>
+                  <th className="w-24 whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Prioridade</th>
+                  <th className="w-20 whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Ativo</th>
+                  <th className="w-24 whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Acoes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -330,10 +328,22 @@ const MapeamentoServicosView = () => {
                         {regra.tipo_servico}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{regra.fornecedor_pattern || '-'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{regra.uf_emitente_pattern || '-'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{regra.endereco_tomador_pattern || '-'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{regra.padrao_pessoa_fisica ? 'Sim' : '-'}</td>
+                    <td className="truncate px-4 py-3 text-slate-700" title={regra.fornecedor_pattern || undefined}>{regra.fornecedor_pattern || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {regra.uf_emitente_pattern || regra.endereco_tomador_pattern || regra.padrao_pessoa_fisica ? (
+                        <div className="space-y-0.5 text-xs">
+                          {regra.uf_emitente_pattern && (
+                            <div><span className="font-bold text-slate-400">UF:</span> {regra.uf_emitente_pattern}</div>
+                          )}
+                          {regra.endereco_tomador_pattern && (
+                            <div><span className="font-bold text-slate-400">Endereco:</span> {regra.endereco_tomador_pattern}</div>
+                          )}
+                          {regra.padrao_pessoa_fisica && (
+                            <div className="font-bold text-amber-600">PF + Numero</div>
+                          )}
+                        </div>
+                      ) : '-'}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-700">{regra.prioridade}</td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <button
