@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import { AlertCircle, BarChart3, Calendar, CalendarClock, ChevronDown, ChevronRight, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Receipt, RefreshCw, Tag, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import PlanilhasView from './FerramentasView';
+import MapeamentoServicosView from './MapeamentoServicosView';
 import { api, type NfseRecord } from '../utils/api';
 import { getXmlContent, getRemInfo, downloadTextFile } from '../utils/cteXml';
 
@@ -17,6 +18,7 @@ const qivezTabs = [
 
 const ferramentasTabs = [
   { id: 'ferramentas_planilhas', label: 'Conciliar Planilhas Transp.', icon: FileSpreadsheet },
+  { id: 'ferramentas_mapeamento_servicos', label: 'Mapeamento Servicos', icon: Tag },
 ];
 
 const nfseTabs = [
@@ -1021,6 +1023,16 @@ const nfseMesAtual = () => {
 
 const NFSE_PAGE_SIZE = 30;
 
+const TIPOS_SERVICO = ['Transporte', 'Telecom', 'Terceirizado', 'Marketplace', 'Demais Servicos'];
+
+const TIPO_SERVICO_BADGE_CLASS: Record<string, string> = {
+  Transporte: 'border-blue-200 bg-blue-100 text-blue-700',
+  Telecom: 'border-purple-200 bg-purple-100 text-purple-700',
+  Terceirizado: 'border-amber-200 bg-amber-100 text-amber-700',
+  Marketplace: 'border-emerald-200 bg-emerald-100 text-emerald-700',
+  'Demais Servicos': 'border-slate-200 bg-slate-100 text-slate-600',
+};
+
 const computeValorLiquidoNfse = (row: NfseRecord) => {
   const totalTributos = [row.iss_retido, row.irrf, row.csll, row.pis, row.cofins, row.inss]
     .reduce<number>((sum, value) => sum + Number(value || 0), 0);
@@ -1117,10 +1129,11 @@ const NfseListaView = () => {
   const [razaoSocialEmitente, setRazaoSocialEmitente] = useState('');
   const [cancelada, setCancelada] = useState<'' | 'true' | 'false'>('');
   const [canalVenda, setCanalVenda] = useState('');
+  const [tipoServico, setTipoServico] = useState('');
   const [cnpjTomadors, setCnpjTomadors] = useState<string[]>([]);
   const [canaisVenda, setCanaisVenda] = useState<string[]>([]);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', campoData: 'emissao' as 'emissao' | 'competencia', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '' as '' | 'true' | 'false', canalVenda: '' });
+  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', campoData: 'emissao' as 'emissao' | 'competencia', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '' as '' | 'true' | 'false', canalVenda: '', tipoServico: '' });
   const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
 
   useEffect(() => {
@@ -1148,14 +1161,14 @@ const NfseListaView = () => {
 
   const applyFilters = () => {
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: numeroNota.trim(), campoData, dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), cancelada, canalVenda });
+    setAppliedFilters({ numeroNota: numeroNota.trim(), campoData, dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), cancelada, canalVenda, tipoServico });
   };
 
   const clearFilters = () => {
     const mes = nfseMesAtual();
-    setNumeroNota(''); setCampoData('emissao'); setDataInicio(mes.inicio); setDataFim(mes.fim); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCancelada(''); setCanalVenda('');
+    setNumeroNota(''); setCampoData('emissao'); setDataInicio(mes.inicio); setDataFim(mes.fim); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCancelada(''); setCanalVenda(''); setTipoServico('');
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: '', campoData: 'emissao', dataInicio: mes.inicio, dataFim: mes.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '', canalVenda: '' });
+    setAppliedFilters({ numeroNota: '', campoData: 'emissao', dataInicio: mes.inicio, dataFim: mes.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '', canalVenda: '', tipoServico: '' });
   };
 
   const hasUrl = rows.length > 0 && rows.some(r => r.url);
@@ -1356,6 +1369,16 @@ const NfseListaView = () => {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Tipo de Servico</label>
+              <select value={tipoServico} onChange={event => setTipoServico(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20">
+                <option value="">Todos</option>
+                {TIPOS_SERVICO.map(item => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
             <div className="flex items-center gap-2">
               <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
                 Filtrar
@@ -1412,12 +1435,21 @@ const NfseListaView = () => {
                         )}
                       </td>
                       <td className="max-w-[280px] px-4 py-3">
-                        {typeof row.canal_de_venda === 'string' && row.canal_de_venda.trim() !== '' && (
-                          <span className="mb-1 inline-flex items-center gap-1 rounded-full border border-[var(--engage-blue-400)]/30 bg-[var(--engage-blue-400)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--engage-blue-800)]">
-                            <Tag size={11} className="shrink-0" />
-                            {row.canal_de_venda}
-                          </span>
-                        )}
+                        {(typeof row.canal_de_venda === 'string' && row.canal_de_venda.trim() !== '') || (typeof row.tipo_servico === 'string' && row.tipo_servico.trim() !== '') ? (
+                          <div className="mb-1 flex flex-wrap gap-1">
+                            {typeof row.canal_de_venda === 'string' && row.canal_de_venda.trim() !== '' && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--engage-blue-400)]/30 bg-[var(--engage-blue-400)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--engage-blue-800)]">
+                                <Tag size={11} className="shrink-0" />
+                                {row.canal_de_venda}
+                              </span>
+                            )}
+                            {typeof row.tipo_servico === 'string' && row.tipo_servico.trim() !== '' && (
+                              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${TIPO_SERVICO_BADGE_CLASS[row.tipo_servico] || 'border-slate-200 bg-slate-100 text-slate-600'}`}>
+                                {row.tipo_servico}
+                              </span>
+                            )}
+                          </div>
+                        ) : null}
                         <div className="truncate text-slate-700" title={formatCellValue(row.razao_social_emitente)}>
                           {formatCellValue(row.razao_social_emitente)}
                         </div>
@@ -1817,6 +1849,10 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
 
           {activeTab === 'ferramentas_planilhas' && hasPermission('ferramentas_planilhas') && (
             <PlanilhasView />
+          )}
+
+          {activeTab === 'ferramentas_mapeamento_servicos' && hasPermission('ferramentas_mapeamento_servicos') && (
+            <MapeamentoServicosView />
           )}
 
           {activeTab === 'conciliacao_nfse_lista' && hasPermission('conciliacao_nfse_lista') && (

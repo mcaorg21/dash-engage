@@ -43,6 +43,69 @@ export async function initDb() {
       conciliado_por TEXT,
       conciliado_em  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS mapeamento_tipo_servico (
+      id                       SERIAL      PRIMARY KEY,
+      tipo_servico             TEXT        NOT NULL,
+      fornecedor_pattern       TEXT,
+      uf_emitente_pattern      TEXT,
+      endereco_tomador_pattern TEXT,
+      padrao_pessoa_fisica     BOOLEAN     NOT NULL DEFAULT FALSE,
+      prioridade               INTEGER     NOT NULL DEFAULT 100,
+      ativo                    BOOLEAN     NOT NULL DEFAULT TRUE,
+      observacao               TEXT,
+      criado_em                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      atualizado_em            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    DO $$
+    BEGIN
+      IF to_regclass('public.controle_arquivos_drive') IS NOT NULL THEN
+        ALTER TABLE controle_arquivos_drive ADD COLUMN IF NOT EXISTS tipo_servico TEXT;
+      END IF;
+    END $$;
+
+    CREATE OR REPLACE FUNCTION fn_classificar_tipo_servico(
+      p_razao_social TEXT,
+      p_uf_emitente TEXT,
+      p_endereco_tomador TEXT
+    ) RETURNS TEXT AS $BODY$
+    DECLARE
+      v_tipo TEXT;
+    BEGIN
+      SELECT m.tipo_servico INTO v_tipo
+      FROM mapeamento_tipo_servico m
+      WHERE m.ativo = TRUE
+        AND (m.fornecedor_pattern IS NULL OR m.fornecedor_pattern = '' OR p_razao_social ~* ('\\m' || m.fornecedor_pattern || '\\M'))
+        AND (m.uf_emitente_pattern IS NULL OR m.uf_emitente_pattern = '' OR p_uf_emitente ILIKE ('%' || m.uf_emitente_pattern || '%'))
+        AND (m.endereco_tomador_pattern IS NULL OR m.endereco_tomador_pattern = '' OR p_endereco_tomador ILIKE ('%' || m.endereco_tomador_pattern || '%'))
+        AND (m.padrao_pessoa_fisica = FALSE OR p_razao_social ~ '[0-9]{6,}\\s*$')
+      ORDER BY m.prioridade ASC, m.id ASC
+      LIMIT 1;
+
+      RETURN COALESCE(v_tipo, 'Demais Servicos');
+    END;
+    $BODY$ LANGUAGE plpgsql STABLE;
+
+    CREATE OR REPLACE FUNCTION trg_classificar_tipo_servico() RETURNS TRIGGER AS $BODY$
+    BEGIN
+      NEW.tipo_servico := fn_classificar_tipo_servico(NEW.razao_social_emitente, NEW.cidade_uf_emitente, NEW.endereco_tomador);
+      RETURN NEW;
+    END;
+    $BODY$ LANGUAGE plpgsql;
+
+    DO $$
+    BEGIN
+      IF to_regclass('public.controle_arquivos_drive') IS NOT NULL THEN
+        DROP TRIGGER IF EXISTS trg_controle_arquivos_drive_tipo_servico ON controle_arquivos_drive;
+        CREATE TRIGGER trg_controle_arquivos_drive_tipo_servico
+          BEFORE INSERT OR UPDATE OF razao_social_emitente, cidade_uf_emitente, endereco_tomador
+          ON controle_arquivos_drive
+          FOR EACH ROW
+          EXECUTE FUNCTION trg_classificar_tipo_servico();
+      END IF;
+    END $$;
   `);
+
   console.log('Database initialized');
 }

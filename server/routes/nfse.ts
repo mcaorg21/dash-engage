@@ -57,7 +57,7 @@ router.get('/lista', async (req: AuthRequest, res) => {
     const allowed = await hasPermission(req, 'conciliacao_nfse_lista');
     if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
 
-    const { numeroNota, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente, campoData, cancelada, canalVenda } = req.query;
+    const { numeroNota, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente, campoData, cancelada, canalVenda, tipoServico } = req.query;
 
     const campoDataColuna = campoData === 'competencia' ? 'competencia_servico' : 'data_emissao';
 
@@ -97,6 +97,10 @@ router.get('/lista', async (req: AuthRequest, res) => {
     if (canalVenda) {
       conditions.push(`canal_de_venda = $${idx++}`);
       values.push(String(canalVenda));
+    }
+    if (tipoServico) {
+      conditions.push(`tipo_servico = $${idx++}`);
+      values.push(String(tipoServico));
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

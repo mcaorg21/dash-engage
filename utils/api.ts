@@ -69,6 +69,7 @@ export interface NfseRecord {
   competencia_servico?: unknown;
   cancelada?: unknown;
   canal_de_venda?: unknown;
+  tipo_servico?: unknown;
   cnpj_tomador?: unknown;
   cnpj_emitente?: unknown;
   nome_arquivo?: unknown;
@@ -103,6 +104,31 @@ export interface QivezDashboardMonth {
 export interface QivezDashboardResponse {
   totalCancelado: number;
   months: QivezDashboardMonth[];
+}
+
+export interface MapeamentoTipoServico {
+  id: number;
+  tipo_servico: string;
+  fornecedor_pattern: string | null;
+  uf_emitente_pattern: string | null;
+  endereco_tomador_pattern: string | null;
+  padrao_pessoa_fisica: boolean;
+  prioridade: number;
+  ativo: boolean;
+  observacao: string | null;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+export interface MapeamentoTipoServicoInput {
+  tipoServico: string;
+  fornecedorPattern?: string;
+  ufEmitentePattern?: string;
+  enderecoTomadorPattern?: string;
+  padraoPessoaFisica?: boolean;
+  prioridade?: number;
+  ativo?: boolean;
+  observacao?: string;
 }
 
 export const api = {
@@ -253,7 +279,7 @@ export const api = {
 
   getNfseCnpjs: () => request<string[]>('/nfse/cnpjs'),
 
-  getNfseLista: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; campoData?: 'emissao' | 'competencia'; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; cancelada?: '' | 'true' | 'false'; canalVenda?: string } = {}) => {
+  getNfseLista: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; campoData?: 'emissao' | 'competencia'; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; cancelada?: '' | 'true' | 'false'; canalVenda?: string; tipoServico?: string } = {}) => {
     const params = new URLSearchParams();
     if (filters.numeroNota) params.set('numeroNota', filters.numeroNota);
     if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
@@ -264,6 +290,7 @@ export const api = {
     if (filters.razaoSocialEmitente) params.set('razaoSocialEmitente', filters.razaoSocialEmitente);
     if (filters.cancelada) params.set('cancelada', filters.cancelada);
     if (filters.canalVenda) params.set('canalVenda', filters.canalVenda);
+    if (filters.tipoServico) params.set('tipoServico', filters.tipoServico);
     const query = params.toString();
     return request<NfseRecord[]>(`/nfse/lista${query ? `?${query}` : ''}`);
   },
@@ -305,5 +332,36 @@ export const api = {
   deleteColumnName: (columnName: string) =>
     request<{ deleted: string }>(`/ferramentas/mapeamentos/${encodeURIComponent(columnName)}`, {
       method: 'DELETE',
+    }),
+
+  getMapeamentoTipoServico: () =>
+    request<MapeamentoTipoServico[]>('/mapeamento-servicos'),
+
+  getMapeamentoFornecedores: () =>
+    request<string[]>('/mapeamento-servicos/fornecedores'),
+
+  getMapeamentoTipoServicoContagem: () =>
+    request<{ tipo_servico: string; total: number }[]>('/mapeamento-servicos/contagem'),
+
+  createMapeamentoTipoServico: (data: MapeamentoTipoServicoInput) =>
+    request<MapeamentoTipoServico>('/mapeamento-servicos', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateMapeamentoTipoServico: (id: number, data: MapeamentoTipoServicoInput) =>
+    request<MapeamentoTipoServico>(`/mapeamento-servicos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteMapeamentoTipoServico: (id: number) =>
+    request<{ deleted: number }>(`/mapeamento-servicos/${id}`, {
+      method: 'DELETE',
+    }),
+
+  reclassificarTipoServico: () =>
+    request<{ atualizados: number }>('/mapeamento-servicos/reclassificar', {
+      method: 'POST',
     }),
 };

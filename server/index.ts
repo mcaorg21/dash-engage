@@ -8,6 +8,7 @@ import usersRoutes from './routes/users.js';
 import qivezRoutes from './routes/qivez.js';
 import ferramentasRoutes from './routes/ferramentas.js';
 import nfseRoutes from './routes/nfse.js';
+import mapeamentoServicosRoutes from './routes/mapeamentoServicos.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.RAILWAY_ENVIRONMENT_NAME);
@@ -25,6 +26,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/qivez', qivezRoutes);
 app.use('/api/ferramentas', ferramentasRoutes);
 app.use('/api/nfse', nfseRoutes);
+app.use('/api/mapeamento-servicos', mapeamentoServicosRoutes);
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
 if (isProd) {
