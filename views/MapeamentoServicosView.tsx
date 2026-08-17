@@ -142,6 +142,12 @@ const MapeamentoServicosView = () => {
         await api.deleteMapeamentoTipoServico(regra.id);
         if (editingId === regra.id) resetForm();
         await loadRegras();
+        try {
+          await api.reclassificarTipoServico();
+        } catch {
+          // reclassificacao automatica e best-effort; falha aqui nao deve bloquear a remocao da regra
+        }
+        await loadContagem();
       } catch (err: any) {
         showAlert(err.message || 'Erro ao remover regra.');
       }
@@ -161,6 +167,12 @@ const MapeamentoServicosView = () => {
         observacao: regra.observacao || undefined,
       });
       await loadRegras();
+      try {
+        await api.reclassificarTipoServico();
+      } catch {
+        // reclassificacao automatica e best-effort; falha aqui nao deve bloquear a atualizacao da regra
+      }
+      await loadContagem();
     } catch (err: any) {
       showAlert(err.message || 'Erro ao atualizar regra.');
     }

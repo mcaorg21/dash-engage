@@ -149,4 +149,31 @@ router.patch('/:id/valor-liquido', async (req: AuthRequest, res) => {
   }
 });
 
+router.patch('/:id/canal-venda', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_nfse_lista');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const id = Number(req.params.id);
+    const canalVenda = typeof req.body?.canalVenda === 'string' ? req.body.canalVenda.trim() : '';
+    if (!Number.isFinite(id) || !canalVenda) {
+      res.status(400).json({ error: 'Dados invalidos' });
+      return;
+    }
+
+    const result = await pool.query(
+      'UPDATE controle_arquivos_drive SET canal_de_venda = $1 WHERE id = $2 RETURNING canal_de_venda',
+      [canalVenda, id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Registro nao encontrado' });
+      return;
+    }
+    res.json({ canal_de_venda: result.rows[0].canal_de_venda });
+  } catch (err) {
+    console.error('NFSe canal de venda update error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 export default router;

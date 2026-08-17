@@ -1115,6 +1115,78 @@ const ValorLiquidoInput = ({ row, onSaved }: { row: NfseRecord; onSaved: (id: un
   );
 };
 
+const CANAL_VENDA_REVISAR = 'REVISAR - COMPARAÇÃO DE VALOR';
+
+const CANAIS_VENDA_ADICIONAIS = ['LOJA INTEGRADA - O MAGAZINE', 'LOJA INTEGRADA - WINECOM'];
+
+const CanalVendaEditor = ({ row, canaisVenda, onSaved }: { row: NfseRecord; canaisVenda: string[]; onSaved: (id: unknown, value: string) => void }) => {
+  const rowId = row.id;
+  const initialValue = typeof row.canal_de_venda === 'string' ? row.canal_de_venda : '';
+  const [value, setValue] = useState(initialValue);
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+
+  useEffect(() => {
+    setValue(initialValue);
+    setStatus('idle');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowId]);
+
+  useEffect(() => {
+    if (status !== 'saved') return;
+    const timer = setTimeout(() => setStatus('idle'), 2500);
+    return () => clearTimeout(timer);
+  }, [status]);
+
+  const handleChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const novoValor = event.target.value;
+    const anterior = value;
+    setValue(novoValor);
+    if (!novoValor || novoValor === anterior) return;
+
+    setSaving(true);
+    setStatus('idle');
+    try {
+      await api.updateNfseCanalVenda(row.id as string | number, novoValor);
+      onSaved(row.id, novoValor);
+      setStatus('saved');
+    } catch {
+      setStatus('error');
+      setValue(anterior);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const opcoesDisponiveis = canaisVenda.filter(item => item !== CANAL_VENDA_REVISAR);
+
+  return (
+    <div className="relative inline-block">
+      <select
+        value={value}
+        onChange={handleChange}
+        disabled={saving}
+        title="Selecione o canal de venda correto"
+        className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide outline-none transition-colors focus:ring-2 focus:ring-[var(--engage-blue-400)]/20 ${
+          status === 'error'
+            ? 'border-red-300 bg-red-50 text-red-700'
+            : 'border-amber-300 bg-amber-50 text-amber-700'
+        }`}
+      >
+        <option value={CANAL_VENDA_REVISAR}>{CANAL_VENDA_REVISAR}</option>
+        {opcoesDisponiveis.map(item => (
+          <option key={item} value={item}>{item}</option>
+        ))}
+      </select>
+      {status === 'saved' && (
+        <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded-full border border-green-200 bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700 shadow-sm">
+          Salvo com sucesso
+        </span>
+      )}
+    </div>
+  );
+};
+
 const NfseListaView = () => {
   const mesAtual = nfseMesAtual();
   const [rows, setRows] = useState<NfseRecord[]>([]);
@@ -1138,7 +1210,7 @@ const NfseListaView = () => {
 
   useEffect(() => {
     api.getNfseCnpjs().then(values => setCnpjTomadors([...values].sort())).catch(() => {});
-    api.getNfseCanaisVenda().then(values => setCanaisVenda([...values].sort())).catch(() => {});
+    api.getNfseCanaisVenda().then(values => setCanaisVenda(Array.from(new Set([...values, ...CANAIS_VENDA_ADICIONAIS])).sort())).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1438,10 +1510,20 @@ const NfseListaView = () => {
                         {(typeof row.canal_de_venda === 'string' && row.canal_de_venda.trim() !== '') || (typeof row.tipo_servico === 'string' && row.tipo_servico.trim() !== '') ? (
                           <div className="mb-1 flex flex-wrap gap-1">
                             {typeof row.canal_de_venda === 'string' && row.canal_de_venda.trim() !== '' && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--engage-blue-400)]/30 bg-[var(--engage-blue-400)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--engage-blue-800)]">
-                                <Tag size={11} className="shrink-0" />
-                                {row.canal_de_venda}
-                              </span>
+                              row.canal_de_venda.trim() === CANAL_VENDA_REVISAR ? (
+                                <CanalVendaEditor
+                                  row={row}
+                                  canaisVenda={canaisVenda}
+                                  onSaved={(id, value) => {
+                                    setRows(prev => prev.map(item => (item.id === id ? { ...item, canal_de_venda: value } : item)));
+                                  }}
+                                />
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-[var(--engage-blue-400)]/30 bg-[var(--engage-blue-400)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--engage-blue-800)]">
+                                  <Tag size={11} className="shrink-0" />
+                                  {row.canal_de_venda}
+                                </span>
+                              )
                             )}
                             {typeof row.tipo_servico === 'string' && row.tipo_servico.trim() !== '' && (
                               <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${TIPO_SERVICO_BADGE_CLASS[row.tipo_servico] || 'border-slate-200 bg-slate-100 text-slate-600'}`}>
@@ -1532,6 +1614,7 @@ const NfseListaView = () => {
           </>
         )}
       </div>
+
     </div>
   );
 };

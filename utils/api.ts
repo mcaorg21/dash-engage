@@ -304,6 +304,12 @@ export const api = {
       body: JSON.stringify({ valorLiquido }),
     }),
 
+  updateNfseCanalVenda: (id: number | string, canalVenda: string) =>
+    request<{ canal_de_venda: string }>(`/nfse/${id}/canal-venda`, {
+      method: 'PATCH',
+      body: JSON.stringify({ canalVenda }),
+    }),
+
   extractPlanilhas: () =>
     request<ExtractRow[]>('/ferramentas/planilhas/extract'),
 
