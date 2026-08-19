@@ -126,6 +126,156 @@ export async function initDb() {
           EXECUTE FUNCTION trg_classificar_tipo_servico();
       END IF;
     END $$;
+
+    CREATE OR REPLACE FUNCTION public.calcular_canal_de_venda(p_razao_social_emitente text, p_cnpj_tomador text, p_valor_liquido numeric)
+    RETURNS text
+    LANGUAGE plpgsql
+    IMMUTABLE
+    AS $BODY$
+    DECLARE
+        v_razao  TEXT;
+        v_cnpj   TEXT;
+        v_sufixo TEXT;
+    BEGIN
+        v_razao := UPPER(TRIM(COALESCE(p_razao_social_emitente, '')));
+        v_cnpj := REGEXP_REPLACE(COALESCE(p_cnpj_tomador, ''), '[^0-9]', '', 'g');
+        v_sufixo := RIGHT(v_cnpj, 6);
+
+        RETURN CASE
+            WHEN v_razao ~ '\\mWEBCONTINENTAL\\M' THEN 'WEBCONTINENTAL'
+            WHEN v_razao ~ '\\mTIKTOK\\M' THEN 'TIKTOK'
+            WHEN v_razao ~ '\\mKABUM\\M' THEN 'KABUM'
+            WHEN v_razao ~ '\\mCARREFOUR\\M' THEN 'CARREFOUR'
+            WHEN v_razao ~ '\\mFAST SHOP\\M' THEN 'FAST SHOP'
+            WHEN v_razao ~ '\\mLEROY MERLIN\\M' THEN 'LEROY MERLIN'
+            WHEN v_razao ~ '\\mMADEIRA MADEIRA\\M' THEN 'MADEIRA MADEIRA'
+            WHEN v_razao ~ '^MARTINS\\M' THEN 'MARTINS'
+            WHEN v_razao ~ '\\mSHEIN\\M' THEN 'SHEIN'
+            WHEN v_razao ~ '\\mSHOPEE\\M' THEN 'SHOPEE'
+            WHEN v_razao ~ '\\mVIA VAREJO\\M' THEN 'VIA VAREJO'
+            WHEN v_razao ~ '\\mAMAZON\\M' THEN
+                CASE v_sufixo
+                    WHEN '000101' THEN 'AMAZON'
+                    WHEN '000284' THEN 'AMAZON DBA'
+                    WHEN '000799' THEN 'AMAZON JUNDIAÍ'
+                    WHEN '000870' THEN 'AMAZON EXTREMA'
+                    ELSE 'NÃO SE APLICA'
+                END
+            WHEN (v_razao ~ '\\mMAGAZINE LUIZA\\M' OR v_razao ~ '\\mMAGALU\\M') THEN
+                CASE v_sufixo
+                    WHEN '000101' THEN 'MAGALU INFO'
+                    WHEN '000284' THEN 'MAGALU ELETRO'
+                    WHEN '000870' THEN 'MAGALU EXTREMA'
+                    ELSE 'NÃO SE APLICA'
+                END
+            WHEN (v_razao ~ '\\mAMERICANAS\\M' OR v_razao ~ '\\mB2W\\M') THEN
+                CASE v_sufixo
+                    WHEN '000101' THEN 'B2W MATRIZ'
+                    WHEN '000870' THEN 'B2W EXTREMA'
+                    ELSE 'NÃO SE APLICA'
+                END
+            WHEN v_razao ~ '\\mMERCADO LIVRE\\M' THEN
+                CASE v_sufixo
+                    WHEN '000284' THEN 'MERCADO LIVRE'
+                    WHEN '000101' THEN 'REVISAR - ENDEREÇO DO TOMADOR'
+                    ELSE 'NÃO SE APLICA'
+                END
+            WHEN v_razao ~ '\\mLOJA INTEGRADA\\M' THEN
+                CASE
+                    WHEN p_valor_liquido IS NULL THEN 'REVISAR - VALOR LÍQUIDO AUSENTE'
+                    ELSE 'REVISAR - COMPARAÇÃO DE VALOR'
+                END
+            ELSE 'NÃO SE APLICA'
+        END;
+    END;
+    $BODY$;
+
+    CREATE OR REPLACE FUNCTION public.calcular_canal_de_venda(p_razao_social_emitente text, p_cnpj_tomador text, p_valor_liquido numeric, p_endereco_tomador text)
+    RETURNS text
+    LANGUAGE plpgsql
+    IMMUTABLE
+    AS $BODY$
+    DECLARE
+        v_razao    TEXT;
+        v_cnpj     TEXT;
+        v_sufixo   TEXT;
+        v_endereco TEXT;
+    BEGIN
+        v_razao := UPPER(TRIM(COALESCE(p_razao_social_emitente, '')));
+        v_cnpj := REGEXP_REPLACE(COALESCE(p_cnpj_tomador, ''), '[^0-9]', '', 'g');
+        v_sufixo := RIGHT(v_cnpj, 6);
+        v_endereco := UPPER(TRIM(COALESCE(p_endereco_tomador, '')));
+
+        IF v_razao ~ '\\mWEBCONTINENTAL\\M' THEN RETURN 'WEBCONTINENTAL';
+        ELSIF v_razao ~ '\\mTIKTOK\\M' THEN RETURN 'TIKTOK';
+        ELSIF v_razao ~ '\\mKABUM\\M' THEN RETURN 'KABUM';
+        ELSIF v_razao ~ '\\mCARREFOUR\\M' THEN RETURN 'CARREFOUR';
+        ELSIF v_razao ~ '\\mFAST SHOP\\M' THEN RETURN 'FAST SHOP';
+        ELSIF v_razao ~ '\\mLEROY MERLIN\\M' THEN RETURN 'LEROY MERLIN';
+        ELSIF (v_razao ~ '\\mMADEIRA MADEIRA\\M' OR v_razao ~ '\\mMADEIRAMADEIRA\\M') THEN RETURN 'MADEIRA MADEIRA';
+        ELSIF v_razao ~ '^MARTINS\\M' THEN RETURN 'MARTINS';
+        ELSIF v_razao ~ '\\mSHEIN\\M' THEN RETURN 'SHEIN';
+        ELSIF v_razao ~ '\\mSHOPEE\\M' THEN RETURN 'SHOPEE';
+        ELSIF v_razao ~ '\\mVIA VAREJO\\M' THEN RETURN 'VIA VAREJO';
+        ELSIF (v_razao ~ '\\mMERCADO LIVRE\\M' OR v_razao ~ '\\mMERCADOLIVRE\\M') THEN
+            IF (v_sufixo = '000284' AND v_endereco LIKE '%SERRA%') THEN RETURN 'MERCADO LIVRE';
+            ELSIF (v_sufixo = '000101' AND (v_endereco LIKE '%ALAMEDA%' OR v_endereco LIKE '%PLEIADES%' OR v_endereco LIKE '%PLÊIADES%')) THEN RETURN 'MERCADO LIVRE FULFILLMENT';
+            ELSIF (v_sufixo = '000101' AND v_endereco LIKE '%SERRA%') THEN RETURN 'MERCADO LIVRE OUTLET';
+            ELSE RETURN 'NÃO SE APLICA';
+            END IF;
+        ELSIF v_razao ~ '\\mAMAZON\\M' THEN
+            RETURN CASE v_sufixo
+                WHEN '000101' THEN 'AMAZON'
+                WHEN '000284' THEN 'AMAZON DBA'
+                WHEN '000799' THEN 'AMAZON JUNDIAÍ'
+                WHEN '000870' THEN 'AMAZON EXTREMA'
+                ELSE 'NÃO SE APLICA'
+            END;
+        ELSIF (v_razao ~ '\\mMAGAZINE LUIZA\\M' OR v_razao ~ '\\mMAGALU\\M') THEN
+            RETURN CASE v_sufixo
+                WHEN '000101' THEN 'MAGALU INFO'
+                WHEN '000284' THEN 'MAGALU ELETRO'
+                WHEN '000870' THEN 'MAGALU EXTREMA'
+                ELSE 'NÃO SE APLICA'
+            END;
+        ELSIF (v_razao ~ '\\mAMERICANAS\\M' OR v_razao ~ '\\mB2W\\M') THEN
+            RETURN CASE v_sufixo
+                WHEN '000101' THEN 'B2W MATRIZ'
+                WHEN '000870' THEN 'B2W EXTREMA'
+                ELSE 'NÃO SE APLICA'
+            END;
+        ELSIF v_razao ~ '\\mLOJA INTEGRADA\\M' THEN
+            IF p_valor_liquido IS NULL THEN RETURN 'NÃO SE APLICA';
+            ELSE RETURN 'REVISAR - COMPARAÇÃO DE VALOR';
+            END IF;
+        ELSE RETURN 'NÃO SE APLICA';
+        END IF;
+    END;
+    $BODY$;
+
+    CREATE OR REPLACE FUNCTION public.trg_preencher_canal_de_venda() RETURNS TRIGGER AS $BODY$
+    BEGIN
+      NEW.canal_de_venda := calcular_canal_de_venda(
+        NEW.razao_social_emitente,
+        NEW.cnpj_tomador,
+        NEW.valor_liquido,
+        NEW.endereco_tomador
+      );
+      RETURN NEW;
+    END;
+    $BODY$ LANGUAGE plpgsql;
+
+    DO $$
+    BEGIN
+      IF to_regclass('public.controle_arquivos_drive') IS NOT NULL THEN
+        DROP TRIGGER IF EXISTS trg_controle_arquivos_drive_canal_de_venda ON controle_arquivos_drive;
+        CREATE TRIGGER trg_controle_arquivos_drive_canal_de_venda
+          BEFORE INSERT OR UPDATE OF razao_social_emitente, cnpj_tomador, valor_liquido
+          ON controle_arquivos_drive
+          FOR EACH ROW
+          EXECUTE FUNCTION trg_preencher_canal_de_venda();
+      END IF;
+    END $$;
   `);
 
   console.log('Database initialized');
