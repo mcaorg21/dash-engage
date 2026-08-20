@@ -116,6 +116,7 @@ export interface MapeamentoTipoServico {
   prioridade: number;
   ativo: boolean;
   observacao: string | null;
+  ocr_pdf_pattern: string | null;
   criado_em: string;
   atualizado_em: string;
   total_notas: number;
@@ -130,6 +131,7 @@ export interface MapeamentoTipoServicoInput {
   prioridade?: number;
   ativo?: boolean;
   observacao?: string;
+  ocrPdfPattern?: string;
 }
 
 export const api = {

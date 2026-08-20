@@ -23,6 +23,7 @@ const EMPTY_FORM: MapeamentoTipoServicoInput = {
   prioridade: 10,
   ativo: true,
   observacao: '',
+  ocrPdfPattern: '',
 };
 
 const MapeamentoServicosView = () => {
@@ -96,14 +97,15 @@ const MapeamentoServicosView = () => {
       prioridade: regra.prioridade,
       ativo: regra.ativo,
       observacao: regra.observacao || '',
+      ocrPdfPattern: regra.ocr_pdf_pattern || '',
     });
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.padraoPessoaFisica && !form.fornecedorPattern?.trim() && !form.ufEmitentePattern?.trim() && !form.enderecoTomadorPattern?.trim()) {
-      showAlert('Informe ao menos um criterio: fornecedor, UF do emitente, endereco do tomador, ou marque o padrao pessoa fisica.');
+    if (!form.padraoPessoaFisica && !form.fornecedorPattern?.trim() && !form.ufEmitentePattern?.trim() && !form.enderecoTomadorPattern?.trim() && !form.ocrPdfPattern?.trim()) {
+      showAlert('Informe ao menos um criterio: fornecedor, UF do emitente, endereco do tomador, OCR do PDF, ou marque o padrao pessoa fisica.');
       return;
     }
     setIsSaving(true);
@@ -114,6 +116,7 @@ const MapeamentoServicosView = () => {
         ufEmitentePattern: form.ufEmitentePattern?.trim() || undefined,
         enderecoTomadorPattern: form.enderecoTomadorPattern?.trim() || undefined,
         observacao: form.observacao?.trim() || undefined,
+        ocrPdfPattern: form.ocrPdfPattern?.trim() || undefined,
       };
       if (editingId) {
         await api.updateMapeamentoTipoServico(editingId, payload);
@@ -165,6 +168,7 @@ const MapeamentoServicosView = () => {
         prioridade: regra.prioridade,
         ativo: !regra.ativo,
         observacao: regra.observacao || undefined,
+        ocrPdfPattern: regra.ocr_pdf_pattern || undefined,
       });
       await loadRegras();
       try {
@@ -317,13 +321,16 @@ const MapeamentoServicosView = () => {
                     </td>
                     <td className="truncate px-4 py-3 text-slate-700" title={regra.fornecedor_pattern || undefined}>{regra.fornecedor_pattern || '-'}</td>
                     <td className="px-4 py-3 text-slate-700">
-                      {regra.uf_emitente_pattern || regra.endereco_tomador_pattern || regra.padrao_pessoa_fisica ? (
+                      {regra.uf_emitente_pattern || regra.endereco_tomador_pattern || regra.padrao_pessoa_fisica || regra.ocr_pdf_pattern ? (
                         <div className="space-y-0.5 text-xs">
                           {regra.uf_emitente_pattern && (
                             <div><span className="font-bold text-slate-400">UF:</span> {regra.uf_emitente_pattern}</div>
                           )}
                           {regra.endereco_tomador_pattern && (
                             <div><span className="font-bold text-slate-400">Endereco:</span> {regra.endereco_tomador_pattern}</div>
+                          )}
+                          {regra.ocr_pdf_pattern && (
+                            <div><span className="font-bold text-slate-400">OCR:</span> {regra.ocr_pdf_pattern}</div>
                           )}
                           {regra.padrao_pessoa_fisica && (
                             <div className="font-bold text-amber-600">PF + Numero</div>
@@ -411,6 +418,17 @@ const MapeamentoServicosView = () => {
                     onChange={event => setForm({ ...form, enderecoTomadorPattern: event.target.value })}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
                   />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">OCR do PDF contem (palavras separadas por virgula)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Transporte, Frete"
+                    value={form.ocrPdfPattern}
+                    onChange={event => setForm({ ...form, ocrPdfPattern: event.target.value })}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                  />
+                  <p className="mt-1 text-xs text-slate-400">Bate se o texto extraido do PDF contiver qualquer uma das palavras. Util para diferenciar o mesmo fornecedor por conteudo, ex: MVTEC "Transporte" x "Assessoria".</p>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Prioridade</label>

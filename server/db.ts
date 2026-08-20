@@ -60,6 +60,8 @@ export async function initDb() {
       atualizado_em            TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    ALTER TABLE mapeamento_tipo_servico ADD COLUMN IF NOT EXISTS ocr_pdf_pattern TEXT;
+
     DO $$
     BEGIN
       IF to_regclass('public.controle_arquivos_drive') IS NOT NULL THEN
@@ -67,14 +69,19 @@ export async function initDb() {
       END IF;
     END $$;
 
+    DROP FUNCTION IF EXISTS fn_regra_bate(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN);
+    DROP FUNCTION IF EXISTS fn_classificar_tipo_servico(TEXT, TEXT, TEXT);
+
     CREATE OR REPLACE FUNCTION fn_regra_bate(
       p_razao_social TEXT,
       p_uf_emitente TEXT,
       p_endereco_tomador TEXT,
+      p_ocr_pdf TEXT,
       p_fornecedor_pattern TEXT,
       p_uf_emitente_pattern TEXT,
       p_endereco_tomador_pattern TEXT,
-      p_padrao_pessoa_fisica BOOLEAN
+      p_padrao_pessoa_fisica BOOLEAN,
+      p_ocr_pdf_pattern TEXT
     ) RETURNS BOOLEAN AS $BODY$
     BEGIN
       RETURN
@@ -85,14 +92,19 @@ export async function initDb() {
         ))
         AND (p_uf_emitente_pattern IS NULL OR p_uf_emitente_pattern = '' OR p_uf_emitente ILIKE ('%' || p_uf_emitente_pattern || '%'))
         AND (p_endereco_tomador_pattern IS NULL OR p_endereco_tomador_pattern = '' OR p_endereco_tomador ILIKE ('%' || p_endereco_tomador_pattern || '%'))
-        AND (p_padrao_pessoa_fisica = FALSE OR p_razao_social ~ '[0-9]{6,}\\s*$');
+        AND (p_padrao_pessoa_fisica = FALSE OR p_razao_social ~ '[0-9]{6,}\\s*$')
+        AND (p_ocr_pdf_pattern IS NULL OR p_ocr_pdf_pattern = '' OR EXISTS (
+          SELECT 1 FROM unnest(string_to_array(p_ocr_pdf_pattern, ',')) AS termo
+          WHERE BTRIM(termo) <> '' AND p_ocr_pdf ILIKE ('%' || BTRIM(termo) || '%')
+        ));
     END;
     $BODY$ LANGUAGE plpgsql IMMUTABLE;
 
     CREATE OR REPLACE FUNCTION fn_classificar_tipo_servico(
       p_razao_social TEXT,
       p_uf_emitente TEXT,
-      p_endereco_tomador TEXT
+      p_endereco_tomador TEXT,
+      p_ocr_pdf TEXT
     ) RETURNS TEXT AS $BODY$
     DECLARE
       v_tipo TEXT;
@@ -100,7 +112,7 @@ export async function initDb() {
       SELECT m.tipo_servico INTO v_tipo
       FROM mapeamento_tipo_servico m
       WHERE m.ativo = TRUE
-        AND fn_regra_bate(p_razao_social, p_uf_emitente, p_endereco_tomador, m.fornecedor_pattern, m.uf_emitente_pattern, m.endereco_tomador_pattern, m.padrao_pessoa_fisica)
+        AND fn_regra_bate(p_razao_social, p_uf_emitente, p_endereco_tomador, p_ocr_pdf, m.fornecedor_pattern, m.uf_emitente_pattern, m.endereco_tomador_pattern, m.padrao_pessoa_fisica, m.ocr_pdf_pattern)
       ORDER BY m.prioridade ASC, m.id ASC
       LIMIT 1;
 
@@ -110,7 +122,7 @@ export async function initDb() {
 
     CREATE OR REPLACE FUNCTION trg_classificar_tipo_servico() RETURNS TRIGGER AS $BODY$
     BEGIN
-      NEW.tipo_servico := fn_classificar_tipo_servico(NEW.razao_social_emitente, NEW.cidade_uf_emitente, NEW.endereco_tomador);
+      NEW.tipo_servico := fn_classificar_tipo_servico(NEW.razao_social_emitente, NEW.cidade_uf_emitente, NEW.endereco_tomador, NEW.ocr_pdf);
       RETURN NEW;
     END;
     $BODY$ LANGUAGE plpgsql;
@@ -120,7 +132,7 @@ export async function initDb() {
       IF to_regclass('public.controle_arquivos_drive') IS NOT NULL THEN
         DROP TRIGGER IF EXISTS trg_controle_arquivos_drive_tipo_servico ON controle_arquivos_drive;
         CREATE TRIGGER trg_controle_arquivos_drive_tipo_servico
-          BEFORE INSERT OR UPDATE OF razao_social_emitente, cidade_uf_emitente, endereco_tomador
+          BEFORE INSERT OR UPDATE OF razao_social_emitente, cidade_uf_emitente, endereco_tomador, ocr_pdf
           ON controle_arquivos_drive
           FOR EACH ROW
           EXECUTE FUNCTION trg_classificar_tipo_servico();
