@@ -22,6 +22,7 @@ const ferramentasTabs = [
 ];
 
 const nfseTabs = [
+  { id: 'conciliacao_nfse_painel', label: 'Painel', icon: LayoutDashboard },
   { id: 'conciliacao_nfse_lista', label: 'Lista', icon: List },
 ];
 
@@ -88,18 +89,20 @@ const DashboardCard = ({
   icon: Icon,
   tone,
   details,
+  format = 'number',
 }: {
   title: string;
   value: unknown;
   icon: React.ElementType;
   tone: string;
   details?: { label: string; value: string }[];
+  format?: 'number' | 'currency';
 }) => (
   <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
     <div className="flex items-center justify-between gap-4">
       <div>
         <div className="text-xs font-bold uppercase tracking-widest text-slate-400">{title}</div>
-        <div className="mt-2 text-3xl font-bold text-slate-900">{formatNumber(value)}</div>
+        <div className="mt-2 text-3xl font-bold text-slate-900">{format === 'currency' ? formatCurrency(value) : formatNumber(value)}</div>
         {details && (
           <div className="mt-3 space-y-1 text-xs font-semibold text-slate-500">
             {details.map(detail => (
@@ -440,6 +443,304 @@ const QivezPainelView = () => {
   );
 };
 
+const NfsePainelView = () => {
+  const [rows, setRows] = useState<import('../utils/api').NfseDashboardMonth[]>([]);
+  const [totalCancelado, setTotalCancelado] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [chartTooltip, setChartTooltip] = useState<{
+    x: number;
+    y: number;
+    mes: string;
+    label: string;
+    value: number;
+    isCurrency: boolean;
+    id: string;
+  } | null>(null);
+  const [isChartTooltipPinned, setIsChartTooltipPinned] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDashboard = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const data = await api.getNfseDashboard();
+        if (!cancelled) {
+          setRows(data.months ?? []);
+          setTotalCancelado(data.totalCancelado ?? 0);
+        }
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Erro ao carregar painel.');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const totals = rows.reduce(
+    (acc, row) => ({
+      total: acc.total + Number(row.total || 0),
+      valorTotal: acc.valorTotal + Number(row.valor_total || 0),
+    }),
+    { total: 0, valorTotal: 0 }
+  );
+  const maxValue = Math.max(...rows.map(row => Number(row.total || 0)), 1);
+  const maxValorValue = Math.max(...rows.map(row => Number(row.valor_total || 0)), 1);
+  const lastMonth = rows[rows.length - 1];
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">NFSe - Painel</h1>
+        <p className="mt-1 text-sm text-slate-500">Acompanhamento temporal das NFSe emitidas.</p>
+      </div>
+
+      {isLoading && (
+        <div className="rounded-xl border border-slate-100 bg-white p-8 text-sm font-medium text-slate-500 shadow-sm">
+          Carregando painel...
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl border border-red-100 bg-white p-8 text-sm font-medium text-red-600 shadow-sm">
+          {error}
+        </div>
+      )}
+
+      {!isLoading && !error && (
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <DashboardCard title="Total NFSe" value={totals.total} icon={Receipt} tone="bg-[var(--engage-blue-400)]/10 text-[var(--engage-blue-800)]" />
+            <DashboardCard title="Canceladas" value={totalCancelado} icon={AlertCircle} tone="bg-amber-50 text-amber-600" />
+            <DashboardCard title="Valor Liquido Total" value={totals.valorTotal} format="currency" icon={FileText} tone="bg-emerald-50 text-emerald-600" />
+            <DashboardCard title="Ultimo mes" value={lastMonth?.total ?? 0} icon={RefreshCw} tone="bg-[var(--engage-blue-500)]/10 text-[var(--engage-blue-500)]" />
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+            <div className="mb-6 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Evolucao mensal</h2>
+                <p className="text-sm text-slate-500">Quantidade de notas em barras, valor liquido total em linha no eixo direito.</p>
+              </div>
+              <div className="flex flex-wrap gap-3 text-xs font-bold text-slate-500">
+                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[var(--engage-blue-600)]" /> Quantidade</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Valor Liquido</span>
+              </div>
+            </div>
+
+            {rows.length === 0 ? (
+              <div className="py-12 text-sm font-medium text-slate-500">Nenhum dado encontrado.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <svg viewBox="0 0 1040 360" className="min-w-[820px]">
+                  {[0, 1, 2, 3, 4].map(step => {
+                    const y = 40 + step * 58;
+                    const value = Math.round(maxValue - (maxValue / 4) * step);
+                    const valorValue = maxValorValue - (maxValorValue / 4) * step;
+
+                    return (
+                      <g key={step}>
+                        <line x1="56" y1={y} x2="940" y2={y} stroke="#e2e8f0" strokeWidth="1" />
+                        <text x="44" y={y + 4} textAnchor="end" className="fill-slate-400 text-[11px] font-bold">
+                          {formatNumber(value)}
+                        </text>
+                        <text x="952" y={y + 4} textAnchor="start" className="fill-emerald-500 text-[11px] font-bold">
+                          {formatCurrencyCompact(valorValue)}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {(() => {
+                    const chartWidth = 884;
+                    const chartHeight = 232;
+                    const groupWidth = chartWidth / rows.length;
+                    const barWidth = Math.max(Math.min(groupWidth / 2.2, 26), 8);
+                    const groupStart = (index: number) => 56 + index * groupWidth + groupWidth / 2;
+                    const yFor = (value: number) => 272 - (value / maxValue) * chartHeight;
+                    const yForValor = (value: number) => 272 - (value / maxValorValue) * chartHeight;
+                    const points = rows.map((row, index) => ({
+                      row,
+                      x: groupStart(index),
+                      y: yForValor(Number(row.valor_total || 0)),
+                      value: Number(row.valor_total || 0),
+                    }));
+                    const linePath = points
+                      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+                      .join(' ');
+                    const areaPath = points.length
+                      ? `${linePath} L ${points[points.length - 1].x} 272 L ${points[0].x} 272 Z`
+                      : '';
+
+                    return (
+                      <>
+                        {areaPath && (
+                          <path d={areaPath} fill="url(#nfseValorAreaGradient)" opacity="0.16" />
+                        )}
+                        <defs>
+                          <linearGradient id="nfseValorAreaGradient" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0%" stopColor="#10b981" />
+                            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                          </linearGradient>
+                        </defs>
+                        {rows.map((row, index) => {
+                          const value = Number(row.total || 0);
+                          const height = (value / maxValue) * chartHeight;
+                          const x = groupStart(index) - barWidth / 2;
+                          const y = yFor(value);
+                          const tooltipData = {
+                            x: x + barWidth / 2,
+                            y,
+                            mes: formatMonthPt(row.mes),
+                            label: 'Quantidade',
+                            value,
+                            isCurrency: false,
+                            id: `${row.mes}-total`,
+                          };
+
+                          return (
+                            <g key={`${row.mes}-bar`}>
+                              <rect
+                                x={x}
+                                y={40}
+                                width={barWidth}
+                                height={232}
+                                fill="transparent"
+                                className="cursor-pointer"
+                                onMouseEnter={() => { if (!isChartTooltipPinned) setChartTooltip(tooltipData); }}
+                                onMouseLeave={() => { if (!isChartTooltipPinned) setChartTooltip(null); }}
+                                onClick={() => {
+                                  if (isChartTooltipPinned && chartTooltip?.id === tooltipData.id) {
+                                    setIsChartTooltipPinned(false); setChartTooltip(null);
+                                  } else { setChartTooltip(tooltipData); setIsChartTooltipPinned(true); }
+                                }}
+                              />
+                              <rect
+                                x={x}
+                                y={y}
+                                width={barWidth}
+                                height={Math.max(height, value > 0 ? 10 : 0)}
+                                rx="4"
+                                fill="var(--engage-blue-600)"
+                                className="pointer-events-none transition-opacity"
+                              />
+                            </g>
+                          );
+                        })}
+                        {linePath && (
+                          <path
+                            d={linePath}
+                            fill="none"
+                            stroke="#10b981"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="4"
+                          />
+                        )}
+                        {points.map(point => (
+                          <g key={String(point.row.mes)}>
+                            <line x1={point.x} y1="40" x2={point.x} y2="272" stroke="#f1f5f9" strokeWidth="1" />
+                            <circle cx={point.x} cy={point.y} r="13" fill="#fff" opacity="0" />
+                            <circle
+                              cx={point.x}
+                              cy={point.y}
+                              r="6"
+                              fill="#fff"
+                              stroke="#10b981"
+                              strokeWidth="4"
+                              className="cursor-pointer transition-opacity hover:opacity-80"
+                              onMouseEnter={() => {
+                                if (isChartTooltipPinned) return;
+                                setChartTooltip({
+                                  x: point.x,
+                                  y: point.y,
+                                  mes: formatMonthPt(point.row.mes),
+                                  label: 'Valor Liquido',
+                                  value: point.value,
+                                  isCurrency: true,
+                                  id: `${point.row.mes}-valor_total`,
+                                });
+                              }}
+                              onMouseLeave={() => {
+                                if (!isChartTooltipPinned) setChartTooltip(null);
+                              }}
+                              onClick={() => {
+                                const nextTooltip = {
+                                  x: point.x,
+                                  y: point.y,
+                                  mes: formatMonthPt(point.row.mes),
+                                  label: 'Valor Liquido',
+                                  value: point.value,
+                                  isCurrency: true,
+                                  id: `${point.row.mes}-valor_total`,
+                                };
+
+                                if (isChartTooltipPinned && chartTooltip?.id === nextTooltip.id) {
+                                  setIsChartTooltipPinned(false);
+                                  setChartTooltip(null);
+                                  return;
+                                }
+
+                                setChartTooltip(nextTooltip);
+                                setIsChartTooltipPinned(true);
+                              }}
+                            />
+                            <text x={point.x} y="318" textAnchor="middle" className="fill-slate-500 text-[11px] font-bold">
+                              {formatMonthPt(point.row.mes)}
+                            </text>
+                          </g>
+                        ))}
+                        {chartTooltip && (
+                          (() => {
+                            const tooltipWidth = 210;
+                            const tooltipHeight = 56;
+                            const tooltipX = Math.min(Math.max(chartTooltip.x - tooltipWidth / 2, 62), 940 - tooltipWidth);
+                            const tooltipY = Math.min(Math.max(chartTooltip.y - tooltipHeight - 14, 12), 272 - tooltipHeight);
+                            const textX = tooltipX + 14;
+
+                            return (
+                              <g pointerEvents="none">
+                                <rect
+                                  x={tooltipX}
+                                  y={tooltipY}
+                                  width={tooltipWidth}
+                                  height={tooltipHeight}
+                                  rx="8"
+                                  fill="#0f172a"
+                                  opacity="0.96"
+                                />
+                                <text x={textX} y={tooltipY + 24} className="fill-white text-[12px] font-bold">
+                                  {chartTooltip.mes} - {chartTooltip.label}
+                                </text>
+                                <text x={textX} y={tooltipY + 44} className="fill-slate-200 text-[11px] font-medium">
+                                  {chartTooltip.isCurrency ? formatCurrency(chartTooltip.value) : `${formatNumber(chartTooltip.value)} notas`}
+                                </text>
+                              </g>
+                            );
+                          })()
+                        )}
+                      </>
+                    );
+                  })()}
+                </svg>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const formatCellValue = (value: unknown) => {
   if (value === null || value === undefined) return '-';
   if (typeof value === 'boolean') return value ? 'Sim' : 'Nao';
@@ -468,6 +769,18 @@ const formatCurrency = (value: unknown) => {
     currency: 'BRL',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  });
+};
+
+const formatCurrencyCompact = (value: unknown) => {
+  const amount = Number(value);
+  if (Number.isNaN(amount)) return 'R$ 0';
+
+  return amount.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    notation: 'compact',
+    maximumFractionDigits: 1,
   });
 };
 
@@ -1936,6 +2249,10 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
 
           {activeTab === 'ferramentas_mapeamento_servicos' && hasPermission('ferramentas_mapeamento_servicos') && (
             <MapeamentoServicosView />
+          )}
+
+          {activeTab === 'conciliacao_nfse_painel' && hasPermission('conciliacao_nfse_painel') && (
+            <NfsePainelView />
           )}
 
           {activeTab === 'conciliacao_nfse_lista' && hasPermission('conciliacao_nfse_lista') && (

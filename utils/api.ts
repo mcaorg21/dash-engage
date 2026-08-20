@@ -106,6 +106,17 @@ export interface QivezDashboardResponse {
   months: QivezDashboardMonth[];
 }
 
+export interface NfseDashboardMonth {
+  mes: string;
+  total: number;
+  valor_total: number;
+}
+
+export interface NfseDashboardResponse {
+  totalCancelado: number;
+  months: NfseDashboardMonth[];
+}
+
 export interface MapeamentoTipoServico {
   id: number;
   tipo_servico: string;
@@ -299,6 +310,8 @@ export const api = {
   },
 
   getNfseCanaisVenda: () => request<string[]>('/nfse/canais-venda'),
+
+  getNfseDashboard: () => request<NfseDashboardResponse>('/nfse/dashboard'),
 
   updateNfseValorLiquido: (id: number | string, valorLiquido: number) =>
     request<{ valor_liquido: number }>(`/nfse/${id}/valor-liquido`, {

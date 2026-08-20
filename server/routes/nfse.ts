@@ -52,6 +52,41 @@ router.get('/canais-venda', async (req: AuthRequest, res) => {
   }
 });
 
+router.get('/dashboard', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_nfse_painel');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const [monthly, canceladasResult] = await Promise.all([
+      pool.query(`
+        SELECT
+          MAKE_DATE(EXTRACT(YEAR FROM data_emissao)::int, EXTRACT(MONTH FROM data_emissao)::int, 1) AS mes,
+          COUNT(*) FILTER (WHERE cancelada IS NOT TRUE)::int AS total,
+          COALESCE(SUM(valor_liquido) FILTER (WHERE cancelada IS NOT TRUE), 0)::float AS valor_total
+        FROM controle_arquivos_drive
+        WHERE data_emissao IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1
+      `),
+      pool.query(`SELECT COUNT(*)::int AS total_cancelado FROM controle_arquivos_drive WHERE cancelada = true`),
+    ]);
+
+    const totalCancelado = Number(canceladasResult.rows[0]?.total_cancelado || 0);
+
+    res.json({
+      totalCancelado,
+      months: monthly.rows.map(row => ({
+        mes: row.mes,
+        total: Number(row.total || 0),
+        valor_total: Number(row.valor_total || 0),
+      })),
+    });
+  } catch (err) {
+    console.error('NFSe dashboard error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 router.get('/lista', async (req: AuthRequest, res) => {
   try {
     const allowed = await hasPermission(req, 'conciliacao_nfse_lista');
