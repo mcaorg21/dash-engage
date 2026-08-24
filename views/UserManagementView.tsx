@@ -9,6 +9,7 @@ const MENU_ITEMS = [
   { id: 'conciliacao_qivez_canceladas', label: 'Canceladas',                group: 'Conciliacao / CTe' },
   { id: 'conciliacao_qivez_importar',   label: 'Importar',                  group: 'Conciliacao / CTe' },
   { id: 'conciliacao_nfse_painel',      label: 'Painel',                    group: 'Conciliacao / NFSe' },
+  { id: 'conciliacao_nfse_nao_conciliadas', label: 'Nao Conciliadas',       group: 'Conciliacao / NFSe' },
   { id: 'conciliacao_nfse_lista',       label: 'Lista',                     group: 'Conciliacao / NFSe' },
   { id: 'ferramentas_planilhas',        label: 'Planilhas',                 group: 'Ferramentas' },
   { id: 'ferramentas_mapeamento_servicos', label: 'Mapeamento Servicos',    group: 'Ferramentas' },
