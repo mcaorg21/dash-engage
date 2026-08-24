@@ -1353,6 +1353,15 @@ const computeValorLiquidoNfse = (row: NfseRecord) => {
   return roundMoney(Number(row.valor_total_servicos || 0) - totalTributos);
 };
 
+const resolveChaveNfse = (row: NfseRecord) => {
+  let jsonXml = row.json_xml;
+  if (typeof jsonXml === 'string') {
+    try { jsonXml = JSON.parse(jsonXml); } catch { return null; }
+  }
+  const codigo = (jsonXml as any)?.Nfse?.InfNfse?.CodigoVerificacao;
+  return typeof codigo === 'string' && codigo.trim() !== '' ? codigo.trim() : null;
+};
+
 const resolveValorLiquido = (row: NfseRecord) => {
   const stored = row.valor_liquido;
   return stored !== null && stored !== undefined && stored !== ''
@@ -1507,6 +1516,7 @@ const NfseListaView = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [numeroNota, setNumeroNota] = useState('');
+  const [chaveNfse, setChaveNfse] = useState('');
   const [campoData, setCampoData] = useState<'emissao' | 'competencia'>('emissao');
   const [dataInicio, setDataInicio] = useState(mesAtual.inicio);
   const [dataFim, setDataFim] = useState(mesAtual.fim);
@@ -1519,7 +1529,7 @@ const NfseListaView = () => {
   const [cnpjTomadors, setCnpjTomadors] = useState<string[]>([]);
   const [canaisVenda, setCanaisVenda] = useState<string[]>([]);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', campoData: 'emissao' as 'emissao' | 'competencia', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '' as '' | 'true' | 'false', canalVenda: '', tipoServico: '' });
+  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', chaveNfse: '', campoData: 'emissao' as 'emissao' | 'competencia', dataInicio: mesAtual.inicio, dataFim: mesAtual.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '' as '' | 'true' | 'false', canalVenda: '', tipoServico: '' });
   const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
 
   useEffect(() => {
@@ -1547,14 +1557,14 @@ const NfseListaView = () => {
 
   const applyFilters = () => {
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: numeroNota.trim(), campoData, dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), cancelada, canalVenda, tipoServico });
+    setAppliedFilters({ numeroNota: numeroNota.trim(), chaveNfse: chaveNfse.trim(), campoData, dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), cancelada, canalVenda, tipoServico });
   };
 
   const clearFilters = () => {
     const mes = nfseMesAtual();
-    setNumeroNota(''); setCampoData('emissao'); setDataInicio(mes.inicio); setDataFim(mes.fim); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCancelada(''); setCanalVenda(''); setTipoServico('');
+    setNumeroNota(''); setChaveNfse(''); setCampoData('emissao'); setDataInicio(mes.inicio); setDataFim(mes.fim); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCancelada(''); setCanalVenda(''); setTipoServico('');
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: '', campoData: 'emissao', dataInicio: mes.inicio, dataFim: mes.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '', canalVenda: '', tipoServico: '' });
+    setAppliedFilters({ numeroNota: '', chaveNfse: '', campoData: 'emissao', dataInicio: mes.inicio, dataFim: mes.fim, cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', cancelada: '', canalVenda: '', tipoServico: '' });
   };
 
   const hasUrl = rows.length > 0 && rows.some(r => r.url);
@@ -1703,6 +1713,12 @@ const NfseListaView = () => {
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
             </div>
             <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Chave NFSe</label>
+              <input type="search" value={chaveNfse} onChange={event => setChaveNfse(event.target.value)}
+                placeholder="Buscar chave"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Filtrar por</label>
               <select value={campoData} onChange={event => setCampoData(event.target.value as 'emissao' | 'competencia')}
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20">
@@ -1813,6 +1829,11 @@ const NfseListaView = () => {
                           {formatDatePt(row.competencia_servico)}
                         </div>
                         <div className="mt-1 font-mono text-xs text-slate-500">Nota {formatCellValue(row.numero_nota)}</div>
+                        {resolveChaveNfse(row) && (
+                          <div className="mt-0.5 max-w-[140px] truncate font-mono text-[10px] text-slate-400" title={resolveChaveNfse(row) || ''}>
+                            {resolveChaveNfse(row)}
+                          </div>
+                        )}
                         {row.cancelada === true && (
                           <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">
                             <XCircle size={11} className="shrink-0" />
@@ -1938,6 +1959,7 @@ const NfseNaoConciliadasView = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [numeroNota, setNumeroNota] = useState('');
+  const [chaveNfse, setChaveNfse] = useState('');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [cnpjTomador, setCnpjTomador] = useState('');
@@ -1947,7 +1969,7 @@ const NfseNaoConciliadasView = () => {
   const [tipoServico, setTipoServico] = useState('');
   const [cnpjTomadors, setCnpjTomadors] = useState<string[]>([]);
   const [canaisVenda, setCanaisVenda] = useState<string[]>([]);
-  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', canalVenda: '', tipoServico: '' });
+  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', chaveNfse: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', canalVenda: '', tipoServico: '' });
   const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
 
   useEffect(() => {
@@ -1975,13 +1997,13 @@ const NfseNaoConciliadasView = () => {
 
   const applyFilters = () => {
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: numeroNota.trim(), dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), canalVenda, tipoServico });
+    setAppliedFilters({ numeroNota: numeroNota.trim(), chaveNfse: chaveNfse.trim(), dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), canalVenda, tipoServico });
   };
 
   const clearFilters = () => {
-    setNumeroNota(''); setDataInicio(''); setDataFim(''); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCanalVenda(''); setTipoServico('');
+    setNumeroNota(''); setChaveNfse(''); setDataInicio(''); setDataFim(''); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCanalVenda(''); setTipoServico('');
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', canalVenda: '', tipoServico: '' });
+    setAppliedFilters({ numeroNota: '', chaveNfse: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', canalVenda: '', tipoServico: '' });
   };
 
   const hasUrl = rows.length > 0 && rows.some(r => r.url);
@@ -2018,6 +2040,12 @@ const NfseNaoConciliadasView = () => {
               <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Numero Nota</label>
               <input type="search" value={numeroNota} onChange={event => setNumeroNota(event.target.value)}
                 placeholder="Buscar numero"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Chave NFSe</label>
+              <input type="search" value={chaveNfse} onChange={event => setChaveNfse(event.target.value)}
+                placeholder="Buscar chave"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
             </div>
             <div>
@@ -2109,6 +2137,11 @@ const NfseNaoConciliadasView = () => {
                           {formatDatePt(row.data_emissao)}
                         </div>
                         <div className="mt-1 font-mono text-xs text-slate-500">Nota {formatCellValue(row.numero_nota)}</div>
+                        {resolveChaveNfse(row) && (
+                          <div className="mt-0.5 max-w-[140px] truncate font-mono text-[10px] text-slate-400" title={resolveChaveNfse(row) || ''}>
+                            {resolveChaveNfse(row)}
+                          </div>
+                        )}
                       </td>
                       <td className="max-w-[280px] px-4 py-3">
                         {(typeof row.canal_de_venda === 'string' && row.canal_de_venda.trim() !== '') || (typeof row.tipo_servico === 'string' && row.tipo_servico.trim() !== '') ? (

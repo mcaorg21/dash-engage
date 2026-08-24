@@ -293,9 +293,10 @@ export const api = {
 
   getNfseCnpjs: () => request<string[]>('/nfse/cnpjs'),
 
-  getNfseLista: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; campoData?: 'emissao' | 'competencia'; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; cancelada?: '' | 'true' | 'false'; canalVenda?: string; tipoServico?: string } = {}) => {
+  getNfseLista: (filters: { numeroNota?: string; chaveNfse?: string; dataInicio?: string; dataFim?: string; campoData?: 'emissao' | 'competencia'; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; cancelada?: '' | 'true' | 'false'; canalVenda?: string; tipoServico?: string } = {}) => {
     const params = new URLSearchParams();
     if (filters.numeroNota) params.set('numeroNota', filters.numeroNota);
+    if (filters.chaveNfse) params.set('chaveNfse', filters.chaveNfse);
     if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
     if (filters.dataFim) params.set('dataFim', filters.dataFim);
     if (filters.campoData) params.set('campoData', filters.campoData);
@@ -313,9 +314,10 @@ export const api = {
 
   getNfseDashboard: () => request<NfseDashboardResponse>('/nfse/dashboard'),
 
-  getNfseNaoConciliadas: (filters: { numeroNota?: string; dataInicio?: string; dataFim?: string; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; canalVenda?: string; tipoServico?: string } = {}) => {
+  getNfseNaoConciliadas: (filters: { numeroNota?: string; chaveNfse?: string; dataInicio?: string; dataFim?: string; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; canalVenda?: string; tipoServico?: string } = {}) => {
     const params = new URLSearchParams();
     if (filters.numeroNota) params.set('numeroNota', filters.numeroNota);
+    if (filters.chaveNfse) params.set('chaveNfse', filters.chaveNfse);
     if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
     if (filters.dataFim) params.set('dataFim', filters.dataFim);
     if (filters.cnpjTomador) params.set('cnpjTomador', filters.cnpjTomador);

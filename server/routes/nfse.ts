@@ -92,7 +92,7 @@ router.get('/lista', async (req: AuthRequest, res) => {
     const allowed = await hasPermission(req, 'conciliacao_nfse_lista');
     if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
 
-    const { numeroNota, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente, campoData, cancelada, canalVenda, tipoServico } = req.query;
+    const { numeroNota, chaveNfse, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente, campoData, cancelada, canalVenda, tipoServico } = req.query;
 
     const campoDataColuna = campoData === 'competencia' ? 'competencia_servico' : 'data_emissao';
 
@@ -103,6 +103,10 @@ router.get('/lista', async (req: AuthRequest, res) => {
     if (numeroNota) {
       conditions.push(`CAST(numero_nota AS TEXT) ILIKE $${idx++}`);
       values.push(`%${String(numeroNota)}%`);
+    }
+    if (chaveNfse) {
+      conditions.push(`(json_xml->'Nfse'->'InfNfse'->>'CodigoVerificacao') ILIKE $${idx++}`);
+      values.push(`%${String(chaveNfse)}%`);
     }
     if (dataInicio) {
       conditions.push(`${campoDataColuna} >= $${idx++}`);
@@ -179,7 +183,7 @@ router.get('/nao-conciliadas', async (req: AuthRequest, res) => {
     const allowed = await hasPermission(req, 'conciliacao_nfse_nao_conciliadas');
     if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
 
-    const { numeroNota, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente, canalVenda, tipoServico } = req.query;
+    const { numeroNota, chaveNfse, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente, canalVenda, tipoServico } = req.query;
 
     const conditions: string[] = ['cancelada IS NOT TRUE', 'existe_sysemp = false', 'json_xml IS NOT NULL'];
     const values: unknown[] = [];
@@ -188,6 +192,10 @@ router.get('/nao-conciliadas', async (req: AuthRequest, res) => {
     if (numeroNota) {
       conditions.push(`CAST(numero_nota AS TEXT) ILIKE $${idx++}`);
       values.push(`%${String(numeroNota)}%`);
+    }
+    if (chaveNfse) {
+      conditions.push(`(json_xml->'Nfse'->'InfNfse'->>'CodigoVerificacao') ILIKE $${idx++}`);
+      values.push(`%${String(chaveNfse)}%`);
     }
     if (dataInicio) {
       conditions.push(`data_emissao >= $${idx++}`);
