@@ -1592,14 +1592,14 @@ const NfeListarView = () => {
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Fornecedor</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Chave NFe</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor Total Nota</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">
+                  <th className="sticky right-0 whitespace-nowrap bg-slate-50 px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)]">
                     Download
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {rows.map((row, rowIndex) => (
-                  <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
+                  <tr key={String(row.id ?? rowIndex)} className="group hover:bg-slate-50/70">
                     <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_emissao)}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.numero_nota)}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={cnpjOptionLabel(String(row.cnpj_tomador || ''))}>
@@ -1613,7 +1613,7 @@ const NfeListarView = () => {
                       {formatChaveNfeComDest(row)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(row.valor)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                    <td className="sticky right-0 whitespace-nowrap bg-white px-4 py-3 text-right shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)] group-hover:bg-slate-50">
                       <button
                         type="button"
                         disabled={!row.json_xml}
