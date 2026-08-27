@@ -1586,7 +1586,6 @@ const NfeListarView = () => {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data Emissão</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Origem</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nº Nota</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Engage</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Fornecedor</th>
@@ -1602,9 +1601,6 @@ const NfeListarView = () => {
                 {rows.map((row, rowIndex) => (
                   <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
                     <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_emissao)}</td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <SistemaBadge value={row.sistema} />
-                    </td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.numero_nota)}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={cnpjOptionLabel(String(row.cnpj_tomador || ''))}>
                       {formatCnpj(String(row.cnpj_tomador || ''))}
