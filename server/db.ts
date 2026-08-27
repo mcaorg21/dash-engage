@@ -164,7 +164,7 @@ export async function initDb() {
             WHEN v_razao ~ '^MARTINS\\M' THEN 'MARTINS'
             WHEN v_razao ~ '\\mSHEIN\\M' THEN 'SHEIN'
             WHEN v_razao ~ '\\mSHOPEE\\M' THEN 'SHOPEE'
-            WHEN v_razao ~ '\\mVIA VAREJO\\M' THEN 'VIA VAREJO'
+            WHEN (v_razao ~ '\\mCNOVA\\M' OR v_razao ~ '\\mVIA VAREJO\\M') THEN 'CASAS BAHIA'
             WHEN v_razao ~ '\\mAMAZON\\M' THEN
                 CASE v_sufixo
                     WHEN '000101' THEN 'AMAZON'
@@ -228,7 +228,7 @@ export async function initDb() {
         ELSIF v_razao ~ '^MARTINS\\M' THEN RETURN 'MARTINS';
         ELSIF v_razao ~ '\\mSHEIN\\M' THEN RETURN 'SHEIN';
         ELSIF v_razao ~ '\\mSHOPEE\\M' THEN RETURN 'SHOPEE';
-        ELSIF v_razao ~ '\\mVIA VAREJO\\M' THEN RETURN 'VIA VAREJO';
+        ELSIF (v_razao ~ '\\mCNOVA\\M' OR v_razao ~ '\\mVIA VAREJO\\M') THEN RETURN 'CASAS BAHIA';
         ELSIF (v_razao ~ '\\mMERCADO LIVRE\\M' OR v_razao ~ '\\mMERCADOLIVRE\\M') THEN
             IF (v_sufixo = '000284' AND v_endereco LIKE '%SERRA%') THEN RETURN 'MERCADO LIVRE';
             ELSIF (v_sufixo = '000101' AND (v_endereco LIKE '%ALAMEDA%' OR v_endereco LIKE '%PLEIADES%' OR v_endereco LIKE '%PLÊIADES%')) THEN RETURN 'MERCADO LIVRE FULFILLMENT';
@@ -282,7 +282,7 @@ export async function initDb() {
       IF to_regclass('public.controle_arquivos_drive') IS NOT NULL THEN
         DROP TRIGGER IF EXISTS trg_controle_arquivos_drive_canal_de_venda ON controle_arquivos_drive;
         CREATE TRIGGER trg_controle_arquivos_drive_canal_de_venda
-          BEFORE INSERT OR UPDATE OF razao_social_emitente, cnpj_tomador, valor_liquido
+          BEFORE INSERT OR UPDATE OF razao_social_emitente, cnpj_tomador, valor_liquido, endereco_tomador
           ON controle_arquivos_drive
           FOR EACH ROW
           EXECUTE FUNCTION trg_preencher_canal_de_venda();
