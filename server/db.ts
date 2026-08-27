@@ -155,16 +155,16 @@ export async function initDb() {
 
         RETURN CASE
             WHEN v_razao ~ '\\mWEBCONTINENTAL\\M' THEN 'WEBCONTINENTAL'
-            WHEN v_razao ~ '\\mTIKTOK\\M' THEN 'TIKTOK'
+            WHEN (v_razao ~ '\\mTIKTOK\\M' OR v_razao ~ '\\mBYTEDANCE\\M') THEN 'TIKTOK'
             WHEN v_razao ~ '\\mKABUM\\M' THEN 'KABUM'
             WHEN v_razao ~ '\\mCARREFOUR\\M' THEN 'CARREFOUR'
             WHEN v_razao ~ '\\mFAST SHOP\\M' THEN 'FAST SHOP'
             WHEN v_razao ~ '\\mLEROY MERLIN\\M' THEN 'LEROY MERLIN'
             WHEN v_razao ~ '\\mMADEIRA MADEIRA\\M' THEN 'MADEIRA MADEIRA'
             WHEN v_razao ~ '^MARTINS\\M' THEN 'MARTINS'
-            WHEN v_razao ~ '\\mSHEIN\\M' THEN 'SHEIN'
+            WHEN (v_razao ~ '\\mSHEIN\\M' OR v_razao ~ '\\mGLOW\\M') THEN 'SHEIN'
             WHEN v_razao ~ '\\mSHOPEE\\M' THEN 'SHOPEE'
-            WHEN (v_razao ~ '\\mCNOVA\\M' OR v_razao ~ '\\mVIA VAREJO\\M') THEN 'VIA VAREJO'
+            WHEN (v_razao ~ '\\mCNOVA\\M' OR v_razao ~ '\\mVIA VAREJO\\M' OR v_razao ~ '\\mCASAS BAHIA\\M') THEN 'VIA VAREJO'
             WHEN v_razao ~ '\\mAMAZON\\M' THEN
                 CASE v_sufixo
                     WHEN '000101' THEN 'AMAZON'
@@ -186,7 +186,7 @@ export async function initDb() {
                     WHEN '000870' THEN 'B2W EXTREMA'
                     ELSE 'NÃO SE APLICA'
                 END
-            WHEN v_razao ~ '\\mMERCADO LIVRE\\M' THEN
+            WHEN (v_razao ~ '\\mMERCADO LIVRE\\M' OR v_razao ~ '\\mEBAZAR\\M' OR v_razao ~ '\\mMERCADO PAGO\\M' OR v_razao ~ '\\mMERCADOPAGO\\M') THEN
                 CASE v_sufixo
                     WHEN '000284' THEN 'MERCADO LIVRE'
                     WHEN '000101' THEN 'REVISAR - ENDEREÇO DO TOMADOR'
@@ -219,20 +219,20 @@ export async function initDb() {
         v_endereco := UPPER(TRIM(COALESCE(p_endereco_tomador, '')));
 
         IF v_razao ~ '\\mWEBCONTINENTAL\\M' THEN RETURN 'WEBCONTINENTAL';
-        ELSIF v_razao ~ '\\mTIKTOK\\M' THEN RETURN 'TIKTOK';
+        ELSIF (v_razao ~ '\\mTIKTOK\\M' OR v_razao ~ '\\mBYTEDANCE\\M') THEN RETURN 'TIKTOK';
         ELSIF v_razao ~ '\\mKABUM\\M' THEN RETURN 'KABUM';
         ELSIF v_razao ~ '\\mCARREFOUR\\M' THEN RETURN 'CARREFOUR';
         ELSIF v_razao ~ '\\mFAST SHOP\\M' THEN RETURN 'FAST SHOP';
         ELSIF v_razao ~ '\\mLEROY MERLIN\\M' THEN RETURN 'LEROY MERLIN';
         ELSIF (v_razao ~ '\\mMADEIRA MADEIRA\\M' OR v_razao ~ '\\mMADEIRAMADEIRA\\M') THEN RETURN 'MADEIRA MADEIRA';
         ELSIF v_razao ~ '^MARTINS\\M' THEN RETURN 'MARTINS';
-        ELSIF v_razao ~ '\\mSHEIN\\M' THEN RETURN 'SHEIN';
+        ELSIF (v_razao ~ '\\mSHEIN\\M' OR v_razao ~ '\\mGLOW\\M') THEN RETURN 'SHEIN';
         ELSIF v_razao ~ '\\mSHOPEE\\M' THEN RETURN 'SHOPEE';
-        ELSIF (v_razao ~ '\\mCNOVA\\M' OR v_razao ~ '\\mVIA VAREJO\\M') THEN RETURN 'VIA VAREJO';
-        ELSIF (v_razao ~ '\\mMERCADO LIVRE\\M' OR v_razao ~ '\\mMERCADOLIVRE\\M') THEN
-            IF (v_sufixo = '000284' AND v_endereco LIKE '%SERRA%') THEN RETURN 'MERCADO LIVRE';
-            ELSIF (v_sufixo = '000101' AND (v_endereco LIKE '%ALAMEDA%' OR v_endereco LIKE '%PLEIADES%' OR v_endereco LIKE '%PLÊIADES%')) THEN RETURN 'MERCADO LIVRE FULFILLMENT';
-            ELSIF (v_sufixo = '000101' AND v_endereco LIKE '%SERRA%') THEN RETURN 'MERCADO LIVRE OUTLET';
+        ELSIF (v_razao ~ '\\mCNOVA\\M' OR v_razao ~ '\\mVIA VAREJO\\M' OR v_razao ~ '\\mCASAS BAHIA\\M') THEN RETURN 'VIA VAREJO';
+        ELSIF (v_razao ~ '\\mMERCADO LIVRE\\M' OR v_razao ~ '\\mMERCADOLIVRE\\M' OR v_razao ~ '\\mEBAZAR\\M' OR v_razao ~ '\\mMERCADO PAGO\\M' OR v_razao ~ '\\mMERCADOPAGO\\M') THEN
+            IF (v_sufixo = '000284' AND (v_endereco LIKE '%SERRA%' OR v_endereco LIKE '%29161-389%' OR v_endereco LIKE '%29161389%')) THEN RETURN 'MERCADO LIVRE';
+            ELSIF (v_sufixo = '000101' AND (v_endereco LIKE '%ALAMEDA%' OR v_endereco LIKE '%PLEIADES%' OR v_endereco LIKE '%PLÊIADES%' OR v_endereco LIKE '%30494-270%' OR v_endereco LIKE '%30494270%')) THEN RETURN 'MERCADO LIVRE FULFILLMENT';
+            ELSIF (v_sufixo = '000101' AND (v_endereco LIKE '%SERRA%' OR v_endereco LIKE '%29161-389%' OR v_endereco LIKE '%29161389%')) THEN RETURN 'MERCADO LIVRE OUTLET';
             ELSE RETURN 'NÃO SE APLICA';
             END IF;
         ELSIF v_razao ~ '\\mAMAZON\\M' THEN
