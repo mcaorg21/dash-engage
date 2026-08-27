@@ -2518,10 +2518,10 @@ const NfseNaoConciliadasView = () => {
 const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void }) => {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isQivezOpen, setIsQivezOpen] = useState(() => localStorage.getItem('menuQivezOpen') === 'true');
-  const [isFerramentasOpen, setIsFerramentasOpen] = useState(() => localStorage.getItem('menuFerramentasOpen') === 'true');
-  const [isNfseOpen, setIsNfseOpen] = useState(() => localStorage.getItem('menuNfseOpen') === 'true');
-  const [isNfeOpen, setIsNfeOpen] = useState(() => localStorage.getItem('menuNfeOpen') === 'true');
+  const [isQivezOpen, setIsQivezOpen] = useState(false);
+  const [isFerramentasOpen, setIsFerramentasOpen] = useState(false);
+  const [isNfseOpen, setIsNfseOpen] = useState(false);
+  const [isNfeOpen, setIsNfeOpen] = useState(false);
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -2592,31 +2592,19 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
   };
 
   const handleQivezToggle = () => {
-    setIsQivezOpen(prev => {
-      localStorage.setItem('menuQivezOpen', String(!prev));
-      return !prev;
-    });
+    setIsQivezOpen(prev => !prev);
   };
 
   const handleFerramentasToggle = () => {
-    setIsFerramentasOpen(prev => {
-      localStorage.setItem('menuFerramentasOpen', String(!prev));
-      return !prev;
-    });
+    setIsFerramentasOpen(prev => !prev);
   };
 
   const handleNfseToggle = () => {
-    setIsNfseOpen(prev => {
-      localStorage.setItem('menuNfseOpen', String(!prev));
-      return !prev;
-    });
+    setIsNfseOpen(prev => !prev);
   };
 
   const handleNfeToggle = () => {
-    setIsNfeOpen(prev => {
-      localStorage.setItem('menuNfeOpen', String(!prev));
-      return !prev;
-    });
+    setIsNfeOpen(prev => !prev);
   };
 
   return (
