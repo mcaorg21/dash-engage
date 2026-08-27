@@ -1481,12 +1481,12 @@ const NfeListarView = () => {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Nome Empresa</label>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Fornecedor</label>
                 <input
                   type="search"
                   value={empresa}
                   onChange={event => setEmpresa(event.target.value)}
-                  placeholder="Buscar empresa"
+                  placeholder="Buscar fornecedor"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
                 />
               </div>
@@ -1506,7 +1506,7 @@ const NfeListarView = () => {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">CNPJ Tomador</label>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">CNPJ Engage</label>
                 <select
                   value={cnpj}
                   onChange={event => setCnpj(event.target.value)}
@@ -1587,10 +1587,12 @@ const NfeListarView = () => {
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data Emissão</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Origem</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Empresa</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nº Nota</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Engage</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Fornecedor</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Fornecedor</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Chave NFe</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tipo</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor Total Nota</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">
                     Download
                   </th>
@@ -1603,13 +1605,17 @@ const NfeListarView = () => {
                     <td className="whitespace-nowrap px-4 py-3">
                       <SistemaBadge value={row.sistema} />
                     </td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCellValue(row.numero_nota)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={cnpjOptionLabel(String(row.cnpj_tomador || ''))}>
+                      {formatCnpj(String(row.cnpj_tomador || ''))}
+                    </td>
                     <td className="max-w-[220px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.empresa)}>
                       {formatCellValue(row.empresa)}
                     </td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCnpj(String(row.cnpj_fornecedor || ''))}</td>
                     <td className="max-w-[360px] truncate whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={formatChaveNfeComDest(row)}>
                       {formatChaveNfeComDest(row)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatCellValue(row.tipo)}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(row.valor)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       <button

@@ -20,7 +20,10 @@ router.use(authenticate);
 
 const municipioSql = `json_xml::jsonb #>> '{NFe,infNFe,dest,enderDest,xMun}'`;
 const cnpjTomadorSql = `json_xml::jsonb #>> '{NFe,infNFe,dest,CNPJ}'`;
-const empresaSql = `json_bd::jsonb #>> '{nfeProc,NFe,infNFe,emit,xFant}'`;
+const empresaSql = `COALESCE(NULLIF(json_xml::jsonb #>> '{NFe,infNFe,emit,xFant}', ''), json_xml::jsonb #>> '{NFe,infNFe,emit,xNome}')`;
+const cnpjFornecedorSql = `json_xml::jsonb #>> '{NFe,infNFe,emit,CNPJ}'`;
+const numeroNotaSql = `json_xml::jsonb #>> '{NFe,infNFe,ide,nNF}'`;
+const valorTotalNotaSql = `(json_xml::jsonb #>> '{NFe,infNFe,total,ICMSTot,vNF}')::numeric`;
 const dataEmissaoSql = `(json_xml::jsonb #>> '{NFe,infNFe,ide,dhEmi}')::date`;
 
 router.get('/sistemas', async (req: AuthRequest, res) => {
@@ -158,8 +161,10 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
         sistema::text AS sistema,
         ${municipioSql} AS municipio,
         ${cnpjTomadorSql} AS cnpj_tomador,
+        ${numeroNotaSql} AS numero_nota,
         ${empresaSql} AS empresa,
-        diferenca_valor AS valor,
+        ${cnpjFornecedorSql} AS cnpj_fornecedor,
+        COALESCE(${valorTotalNotaSql}, diferenca_valor) AS valor,
         json_xml
       FROM public.nfe_lancamentos_financeiros
       WHERE ${filters.join(' AND ')}
