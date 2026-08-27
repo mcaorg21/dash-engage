@@ -164,6 +164,7 @@ export async function initDb() {
             WHEN v_razao ~ '^MARTINS\\M' THEN 'MARTINS'
             WHEN (v_razao ~ '\\mSHEIN\\M' OR v_razao ~ '\\mGLOW\\M') THEN 'SHEIN'
             WHEN v_razao ~ '\\mSHOPEE\\M' THEN 'SHOPEE'
+            WHEN v_razao ~ '\\mSHPS\\M' THEN 'SHOPEE BRASIL'
             WHEN (v_razao ~ '\\mCNOVA\\M' OR v_razao ~ '\\mVIA VAREJO\\M' OR v_razao ~ '\\mCASAS BAHIA\\M') THEN 'VIA VAREJO'
             WHEN v_razao ~ '\\mAMAZON\\M' THEN
                 CASE v_sufixo
@@ -228,6 +229,7 @@ export async function initDb() {
         ELSIF v_razao ~ '^MARTINS\\M' THEN RETURN 'MARTINS';
         ELSIF (v_razao ~ '\\mSHEIN\\M' OR v_razao ~ '\\mGLOW\\M') THEN RETURN 'SHEIN';
         ELSIF v_razao ~ '\\mSHOPEE\\M' THEN RETURN 'SHOPEE';
+        ELSIF v_razao ~ '\\mSHPS\\M' THEN RETURN 'SHOPEE BRASIL';
         ELSIF (v_razao ~ '\\mCNOVA\\M' OR v_razao ~ '\\mVIA VAREJO\\M' OR v_razao ~ '\\mCASAS BAHIA\\M') THEN RETURN 'VIA VAREJO';
         ELSIF (v_razao ~ '\\mMERCADO LIVRE\\M' OR v_razao ~ '\\mMERCADOLIVRE\\M' OR v_razao ~ '\\mEBAZAR\\M' OR v_razao ~ '\\mMERCADO PAGO\\M' OR v_razao ~ '\\mMERCADOPAGO\\M') THEN
             IF (v_sufixo = '000284' AND (v_endereco LIKE '%SERRA%' OR v_endereco LIKE '%29161-389%' OR v_endereco LIKE '%29161389%')) THEN RETURN 'MERCADO LIVRE';
