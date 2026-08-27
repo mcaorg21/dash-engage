@@ -20,6 +20,7 @@ router.use(authenticate);
 
 const municipioSql = `json_xml::jsonb #>> '{NFe,infNFe,dest,enderDest,xMun}'`;
 const cnpjTomadorSql = `json_xml::jsonb #>> '{NFe,infNFe,dest,CNPJ}'`;
+const empresaSql = `json_bd::jsonb #>> '{nfeProc,NFe,infNFe,emit,xFant}'`;
 
 router.get('/sistemas', async (req: AuthRequest, res) => {
   try {
@@ -107,7 +108,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
       return;
     }
 
-    const { dataInicio, dataFim, chaveNfe, sistema, municipio, cnpj } = req.query;
+    const { dataInicio, dataFim, chaveNfe, sistema, municipio, cnpj, empresa } = req.query;
     const filters = ['cancelada = false', '(existe_qives_sysemp = false OR existe_sysemp_qives = false)'];
     const values: string[] = [];
 
@@ -141,6 +142,11 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
       filters.push(`${cnpjTomadorSql} ILIKE $${values.length}`);
     }
 
+    if (typeof empresa === 'string' && empresa.trim()) {
+      values.push(`%${empresa.trim()}%`);
+      filters.push(`${empresaSql} ILIKE $${values.length}`);
+    }
+
     const result = await pool.query(`
       SELECT
         id,
@@ -150,6 +156,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
         sistema::text AS sistema,
         ${municipioSql} AS municipio,
         ${cnpjTomadorSql} AS cnpj_tomador,
+        ${empresaSql} AS empresa,
         diferenca_valor AS valor,
         json_xml
       FROM public.nfe_lancamentos_financeiros

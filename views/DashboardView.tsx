@@ -1349,10 +1349,11 @@ const NfeListarView = () => {
   const [sistema, setSistema] = useState('');
   const [municipio, setMunicipio] = useState('');
   const [cnpj, setCnpj] = useState('');
+  const [empresa, setEmpresa] = useState('');
   const [sistemas, setSistemas] = useState<string[]>([]);
   const [municipios, setMunicipios] = useState<string[]>([]);
   const [cnpjs, setCnpjs] = useState<string[]>([]);
-  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveNfe: '', sistema: '', municipio: '', cnpj: '' });
+  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveNfe: '', sistema: '', municipio: '', cnpj: '', empresa: '' });
 
   useEffect(() => {
     api.getNfeSistemas().then(setSistemas).catch(() => {});
@@ -1367,6 +1368,7 @@ const NfeListarView = () => {
     sistema: sistema.trim(),
     municipio: municipio.trim(),
     cnpj: cnpj.trim(),
+    empresa: empresa.trim(),
   });
 
   useEffect(() => {
@@ -1413,7 +1415,7 @@ const NfeListarView = () => {
         <div className="border-b border-slate-100 px-6 py-4">
           <div className="w-full">
             <form
-              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto_auto] lg:items-end"
+              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto_auto] lg:items-end"
               onSubmit={event => {
                 event.preventDefault();
                 setAppliedFilters(getCurrentFilters());
@@ -1446,6 +1448,17 @@ const NfeListarView = () => {
                   value={chaveNfe}
                   onChange={event => setChaveNfe(event.target.value)}
                   placeholder="Buscar pela chave"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Nome Empresa</label>
+                <input
+                  type="search"
+                  value={empresa}
+                  onChange={event => setEmpresa(event.target.value)}
+                  placeholder="Buscar empresa"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
                 />
               </div>
@@ -1492,7 +1505,8 @@ const NfeListarView = () => {
                   setSistema('');
                   setMunicipio('');
                   setCnpj('');
-                  setAppliedFilters({ dataInicio: '', dataFim: '', chaveNfe: '', sistema: '', municipio: '', cnpj: '' });
+                  setEmpresa('');
+                  setAppliedFilters({ dataInicio: '', dataFim: '', chaveNfe: '', sistema: '', municipio: '', cnpj: '', empresa: '' });
                 }}
               >
                 Limpar
@@ -1569,6 +1583,7 @@ const NfeListarView = () => {
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data de lancamento</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Origem</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Empresa</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Chave NFe</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tipo</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor</th>
@@ -1583,6 +1598,9 @@ const NfeListarView = () => {
                     <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_lancamento)}</td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <SistemaBadge value={row.sistema} />
+                    </td>
+                    <td className="max-w-[220px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.empresa)}>
+                      {formatCellValue(row.empresa)}
                     </td>
                     <td className="max-w-[360px] truncate whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={formatChaveNfeComDest(row)}>
                       {formatChaveNfeComDest(row)}

@@ -223,7 +223,7 @@ export const api = {
   getQivezLancamentosCount: () =>
     request<{ total: number }>('/qivez/lancamentos/count'),
 
-  getNfeLancamentos: (filters: { dataInicio?: string; dataFim?: string; chaveNfe?: string; sistema?: string; municipio?: string; cnpj?: string } = {}) => {
+  getNfeLancamentos: (filters: { dataInicio?: string; dataFim?: string; chaveNfe?: string; sistema?: string; municipio?: string; cnpj?: string; empresa?: string } = {}) => {
     const params = new URLSearchParams();
     if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
     if (filters.dataFim) params.set('dataFim', filters.dataFim);
@@ -231,6 +231,7 @@ export const api = {
     if (filters.sistema) params.set('sistema', filters.sistema);
     if (filters.municipio) params.set('municipio', filters.municipio);
     if (filters.cnpj) params.set('cnpj', filters.cnpj);
+    if (filters.empresa) params.set('empresa', filters.empresa);
 
     const query = params.toString();
     return request<NfeLancamento[]>(`/nfe/lancamentos${query ? `?${query}` : ''}`);
