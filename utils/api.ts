@@ -37,6 +37,8 @@ export interface LoginResponse {
 
 export type QivezLancamento = Record<string, unknown>;
 
+export type NfeLancamento = Record<string, unknown>;
+
 export interface BucketFile {
   name: string;
   size: number;
@@ -220,6 +222,28 @@ export const api = {
 
   getQivezLancamentosCount: () =>
     request<{ total: number }>('/qivez/lancamentos/count'),
+
+  getNfeLancamentos: (filters: { dataInicio?: string; dataFim?: string; chaveNfe?: string; sistema?: string; municipio?: string; cnpj?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
+    if (filters.dataFim) params.set('dataFim', filters.dataFim);
+    if (filters.chaveNfe) params.set('chaveNfe', filters.chaveNfe);
+    if (filters.sistema) params.set('sistema', filters.sistema);
+    if (filters.municipio) params.set('municipio', filters.municipio);
+    if (filters.cnpj) params.set('cnpj', filters.cnpj);
+
+    const query = params.toString();
+    return request<NfeLancamento[]>(`/nfe/lancamentos${query ? `?${query}` : ''}`);
+  },
+
+  getNfeSistemas: () => request<string[]>('/nfe/sistemas'),
+
+  getNfeMunicipios: () => request<string[]>('/nfe/municipios'),
+
+  getNfeCnpjs: () => request<string[]>('/nfe/cnpjs'),
+
+  getNfeLancamentosCount: () =>
+    request<{ total: number }>('/nfe/lancamentos/count'),
 
   getQivezRemInfo: (chaves: string[]) =>
     request<Record<string, { remInfo: string | null; json_xml: unknown }>>('/qivez/rem-info', {

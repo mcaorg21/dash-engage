@@ -11,6 +11,7 @@ const MENU_ITEMS = [
   { id: 'conciliacao_nfse_painel',      label: 'Painel',                    group: 'Conciliacao / NFSe' },
   { id: 'conciliacao_nfse_nao_conciliadas', label: 'Nao Conciliadas',       group: 'Conciliacao / NFSe' },
   { id: 'conciliacao_nfse_lista',       label: 'Lista',                     group: 'Conciliacao / NFSe' },
+  { id: 'conciliacao_nfe_listar',       label: 'Nao Conciliadas',           group: 'Conciliacao / NFe' },
   { id: 'ferramentas_planilhas',        label: 'Planilhas',                 group: 'Ferramentas' },
   { id: 'ferramentas_mapeamento_servicos', label: 'Mapeamento Servicos',    group: 'Ferramentas' },
   { id: 'usuarios',                     label: 'Controle de Usuarios',      group: 'Administracao' },

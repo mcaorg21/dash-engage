@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import JSZip from 'jszip';
-import { AlertCircle, BarChart3, Calendar, CalendarClock, ChevronDown, ChevronRight, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Receipt, RefreshCw, Tag, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
+import { AlertCircle, BarChart3, Calendar, CalendarClock, ChevronDown, ChevronRight, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Package, Receipt, RefreshCw, Tag, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import PlanilhasView from './FerramentasView';
 import MapeamentoServicosView from './MapeamentoServicosView';
 import { api, type NfseRecord } from '../utils/api';
 import { getXmlContent, getRemInfo, downloadTextFile } from '../utils/cteXml';
+import { downloadNfeXml, downloadNfeXmlZip, getDestInfoNfe } from '../utils/nfeXml';
 
 const INTERNAL_LOGO_SRC = '/logo/white-logo.7e189ed.webp';
 
@@ -25,6 +26,10 @@ const nfseTabs = [
   { id: 'conciliacao_nfse_painel', label: 'Painel', icon: LayoutDashboard },
   { id: 'conciliacao_nfse_nao_conciliadas', label: 'Não Conciliadas', icon: AlertCircle },
   { id: 'conciliacao_nfse_lista', label: 'Lista', icon: List },
+];
+
+const nfeTabs = [
+  { id: 'conciliacao_nfe_listar', label: 'Não Conciliadas', icon: List },
 ];
 
 const qivezTitles: Record<string, { title: string; description: string }> = {
@@ -787,6 +792,12 @@ const formatCurrencyCompact = (value: unknown) => {
 
 const roundMoney = (value: unknown) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
+const formatChaveNfeComDest = (row: Record<string, unknown>) => {
+  const chave = formatCellValue(row.chave_nfe);
+  const destInfo = getDestInfoNfe(row.json_xml);
+  return destInfo ? `${chave} - ${destInfo.toUpperCase()}` : chave;
+};
+
 const formatChaveCteComRem = (row: Record<string, unknown>) => {
   const chave = formatCellValue(row.chave_cte);
   const remInfo = getRemInfo(row.json_xml);
@@ -1314,6 +1325,279 @@ const QivezCanceladasView = () => {
                       <button type="button" disabled={!row.json_xml} onClick={() => downloadXml(row)}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40">
                         <Download size={14} /> XML
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const NfeListarView = () => {
+  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [chaveNfe, setChaveNfe] = useState('');
+  const [sistema, setSistema] = useState('');
+  const [municipio, setMunicipio] = useState('');
+  const [cnpj, setCnpj] = useState('');
+  const [sistemas, setSistemas] = useState<string[]>([]);
+  const [municipios, setMunicipios] = useState<string[]>([]);
+  const [cnpjs, setCnpjs] = useState<string[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState({ dataInicio: '', dataFim: '', chaveNfe: '', sistema: '', municipio: '', cnpj: '' });
+
+  useEffect(() => {
+    api.getNfeSistemas().then(setSistemas).catch(() => {});
+    api.getNfeMunicipios().then(values => setMunicipios(normalizeEmpresaOptions(values))).catch(() => {});
+    api.getNfeCnpjs().then(values => setCnpjs([...values].sort())).catch(() => {});
+  }, []);
+
+  const getCurrentFilters = () => ({
+    dataInicio,
+    dataFim,
+    chaveNfe: chaveNfe.trim(),
+    sistema: sistema.trim(),
+    municipio: municipio.trim(),
+    cnpj: cnpj.trim(),
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRows = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const data = await api.getNfeLancamentos(appliedFilters);
+        if (!cancelled) setRows(data);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Erro ao carregar lancamentos.');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadRows();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appliedFilters]);
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">NFe - Não Conciliadas</h1>
+          {!isLoading && !error && (
+            <span className="rounded-full bg-[var(--engage-blue-400)]/15 px-3 py-0.5 text-sm font-bold text-[var(--engage-blue-800)]">
+              {rows.length} {rows.length === 1 ? 'registro' : 'registros'}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-slate-500">
+          Lancamentos financeiros sem NFe Sysemp, ordenados por ID.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-6 py-4">
+          <div className="w-full">
+            <form
+              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto_auto] lg:items-end"
+              onSubmit={event => {
+                event.preventDefault();
+                setAppliedFilters(getCurrentFilters());
+              }}
+            >
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Inicio</label>
+                <input
+                  type="date"
+                  value={dataInicio}
+                  onChange={event => setDataInicio(event.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Fim</label>
+                <input
+                  type="date"
+                  value={dataFim}
+                  onChange={event => setDataFim(event.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Chave NFe</label>
+                <input
+                  type="search"
+                  value={chaveNfe}
+                  onChange={event => setChaveNfe(event.target.value)}
+                  placeholder="Buscar pela chave"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Município</label>
+                <select
+                  value={municipio}
+                  onChange={event => setMunicipio(event.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                >
+                  <option value="">Todos</option>
+                  {municipios.map(item => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">CNPJ Tomador</label>
+                <select
+                  value={cnpj}
+                  onChange={event => setCnpj(event.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+                >
+                  <option value="">Todos</option>
+                  {cnpjs.map(item => (
+                    <option key={item} value={item}>{cnpjOptionLabel(item)}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
+                Filtrar
+              </button>
+
+              <button
+                type="button"
+                className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100"
+                onClick={() => {
+                  setDataInicio('');
+                  setDataFim('');
+                  setChaveNfe('');
+                  setSistema('');
+                  setMunicipio('');
+                  setCnpj('');
+                  setAppliedFilters({ dataInicio: '', dataFim: '', chaveNfe: '', sistema: '', municipio: '', cnpj: '' });
+                }}
+              >
+                Limpar
+              </button>
+
+              <button
+                type="button"
+                disabled={isLoading || isDownloading}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--engage-blue-400)]/10 px-4 py-2 text-sm font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={async () => {
+                  const filters = getCurrentFilters();
+                  setAppliedFilters(filters);
+                  setIsDownloading(true);
+                  setError(null);
+
+                  try {
+                    const filteredRows = await api.getNfeLancamentos(filters);
+                    setRows(filteredRows);
+                    const entries = filteredRows.map(row => ({ chave: formatCellValue(row.chave_nfe), json_xml: row.json_xml }));
+                    await downloadNfeXmlZip(entries, 'lancamentos-nfe-filtrados.zip');
+                  } catch (err: any) {
+                    setError(err.message || 'Erro ao baixar lancamentos filtrados.');
+                  } finally {
+                    setIsDownloading(false);
+                  }
+                }}
+              >
+                <Download size={16} />
+                {isDownloading ? 'Baixando...' : 'Baixar filtrados'}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {sistemas.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-6 py-3">
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Origem:</span>
+            <button
+              type="button"
+              onClick={() => { setSistema(''); setAppliedFilters(f => ({ ...f, sistema: '' })); }}
+              className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${sistema === '' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+            >
+              Todos
+            </button>
+            {sistemas.map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => { setSistema(s); setAppliedFilters(f => ({ ...f, sistema: s })); }}
+                className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${sistema === s ? sistemaBadgeClass(s) + ' ring-2' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="p-8 text-sm font-medium text-slate-500">Carregando lancamentos...</div>
+        )}
+
+        {error && (
+          <div className="p-8 text-sm font-medium text-red-600">{error}</div>
+        )}
+
+        {!isLoading && !error && rows.length === 0 && (
+          <div className="p-8 text-sm font-medium text-slate-500">Nenhum lancamento encontrado.</div>
+        )}
+
+        {!isLoading && !error && rows.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-max border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data de lancamento</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Origem</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Chave NFe</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tipo</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Download
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {rows.map((row, rowIndex) => (
+                  <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_lancamento)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <SistemaBadge value={row.sistema} />
+                    </td>
+                    <td className="max-w-[360px] truncate whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={formatChaveNfeComDest(row)}>
+                      {formatChaveNfeComDest(row)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatCellValue(row.tipo)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(row.valor)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        disabled={!row.json_xml}
+                        onClick={() => downloadNfeXml(row.json_xml, formatCellValue(row.chave_nfe))}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Download size={14} />
+                        XML
                       </button>
                     </td>
                   </tr>
@@ -2237,12 +2521,14 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
   const [isQivezOpen, setIsQivezOpen] = useState(() => localStorage.getItem('menuQivezOpen') === 'true');
   const [isFerramentasOpen, setIsFerramentasOpen] = useState(() => localStorage.getItem('menuFerramentasOpen') === 'true');
   const [isNfseOpen, setIsNfseOpen] = useState(() => localStorage.getItem('menuNfseOpen') === 'true');
+  const [isNfeOpen, setIsNfeOpen] = useState(() => localStorage.getItem('menuNfeOpen') === 'true');
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [showLogoFallback, setShowLogoFallback] = useState(false);
   const [naoConciliadasCount, setNaoConciliadasCount] = useState(0);
   const [naoConciliadasNfseCount, setNaoConciliadasNfseCount] = useState(0);
+  const [naoConciliadasNfeCount, setNaoConciliadasNfeCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -2285,10 +2571,19 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    api.getNfeLancamentosCount()
+      .then(({ total }) => { if (!cancelled) setNaoConciliadasNfeCount(total); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const hasPermission = (id: string) => isAdmin || userPermissions.includes(id);
   const hasAnyQivezPermission = qivezTabs.some(tab => hasPermission(tab.id));
   const hasAnyFerramentasPermission = ferramentasTabs.some(tab => hasPermission(tab.id));
   const hasAnyNfsePermission = nfseTabs.some(tab => hasPermission(tab.id));
+  const hasAnyNfePermission = nfeTabs.some(tab => hasPermission(tab.id));
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -2313,6 +2608,13 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
   const handleNfseToggle = () => {
     setIsNfseOpen(prev => {
       localStorage.setItem('menuNfseOpen', String(!prev));
+      return !prev;
+    });
+  };
+
+  const handleNfeToggle = () => {
+    setIsNfeOpen(prev => {
+      localStorage.setItem('menuNfeOpen', String(!prev));
       return !prev;
     });
   };
@@ -2362,7 +2664,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
             <LayoutDashboard size={18} /> Inicio
           </button>
 
-          {(hasAnyQivezPermission || hasAnyNfsePermission) && (
+          {(hasAnyQivezPermission || hasAnyNfsePermission || hasAnyNfePermission) && (
             <>
               <div className="px-4 pb-2 pt-5 text-[10px] font-bold uppercase tracking-widest text-white/50">
                 Conciliacao
@@ -2443,6 +2745,48 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
                             {tab.id === 'conciliacao_nfse_nao_conciliadas' && naoConciliadasNfseCount > 0 && (
                               <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
                                 {naoConciliadasNfseCount}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {hasAnyNfePermission && (
+                <>
+                  <button
+                    onClick={handleNfeToggle}
+                    className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${nfeTabs.some(tab => tab.id === activeTab) ? 'bg-white/15 text-white ring-1 ring-white/15' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Package size={18} /> NFe
+                      {!isNfeOpen && naoConciliadasNfeCount > 0 && (
+                        <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                          {naoConciliadasNfeCount}
+                        </span>
+                      )}
+                    </span>
+                    {isNfeOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+
+                  {isNfeOpen && (
+                    <div className="space-y-1 pl-4">
+                      {nfeTabs.map(tab => {
+                        if (!hasPermission(tab.id)) return null;
+                        const Icon = tab.icon;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => handleTabChange(tab.id)}
+                            className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                          >
+                            <Icon size={16} /> {tab.label}
+                            {tab.id === 'conciliacao_nfe_listar' && naoConciliadasNfeCount > 0 && (
+                              <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                                {naoConciliadasNfeCount}
                               </span>
                             )}
                           </button>
@@ -2579,6 +2923,10 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
 
           {activeTab === 'conciliacao_nfse_lista' && hasPermission('conciliacao_nfse_lista') && (
             <NfseListaView />
+          )}
+
+          {activeTab === 'conciliacao_nfe_listar' && hasPermission('conciliacao_nfe_listar') && (
+            <NfeListarView />
           )}
         </div>
       </main>
