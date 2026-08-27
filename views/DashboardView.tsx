@@ -1415,14 +1415,14 @@ const NfeListarView = () => {
         <div className="border-b border-slate-100 px-6 py-4">
           <div className="w-full">
             <form
-              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_auto_auto_auto] lg:items-end"
+              className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:items-end"
               onSubmit={event => {
                 event.preventDefault();
                 setAppliedFilters(getCurrentFilters());
               }}
             >
               <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Inicio</label>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Emissão Início</label>
                 <input
                   type="date"
                   value={dataInicio}
@@ -1432,7 +1432,7 @@ const NfeListarView = () => {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Fim</label>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Emissão Fim</label>
                 <input
                   type="date"
                   value={dataFim}
@@ -1491,52 +1491,54 @@ const NfeListarView = () => {
                 </select>
               </div>
 
-              <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
-                Filtrar
-              </button>
+              <div className="flex items-center gap-2">
+                <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
+                  Filtrar
+                </button>
 
-              <button
-                type="button"
-                className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100"
-                onClick={() => {
-                  setDataInicio('');
-                  setDataFim('');
-                  setChaveNfe('');
-                  setSistema('');
-                  setMunicipio('');
-                  setCnpj('');
-                  setEmpresa('');
-                  setAppliedFilters({ dataInicio: '', dataFim: '', chaveNfe: '', sistema: '', municipio: '', cnpj: '', empresa: '' });
-                }}
-              >
-                Limpar
-              </button>
+                <button
+                  type="button"
+                  className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100"
+                  onClick={() => {
+                    setDataInicio('');
+                    setDataFim('');
+                    setChaveNfe('');
+                    setSistema('');
+                    setMunicipio('');
+                    setCnpj('');
+                    setEmpresa('');
+                    setAppliedFilters({ dataInicio: '', dataFim: '', chaveNfe: '', sistema: '', municipio: '', cnpj: '', empresa: '' });
+                  }}
+                >
+                  Limpar
+                </button>
 
-              <button
-                type="button"
-                disabled={isLoading || isDownloading}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--engage-blue-400)]/10 px-4 py-2 text-sm font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40"
-                onClick={async () => {
-                  const filters = getCurrentFilters();
-                  setAppliedFilters(filters);
-                  setIsDownloading(true);
-                  setError(null);
+                <button
+                  type="button"
+                  disabled={isLoading || isDownloading}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--engage-blue-400)]/10 px-4 py-2 text-sm font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={async () => {
+                    const filters = getCurrentFilters();
+                    setAppliedFilters(filters);
+                    setIsDownloading(true);
+                    setError(null);
 
-                  try {
-                    const filteredRows = await api.getNfeLancamentos(filters);
-                    setRows(filteredRows);
-                    const entries = filteredRows.map(row => ({ chave: formatCellValue(row.chave_nfe), json_xml: row.json_xml }));
-                    await downloadNfeXmlZip(entries, 'lancamentos-nfe-filtrados.zip');
-                  } catch (err: any) {
-                    setError(err.message || 'Erro ao baixar lancamentos filtrados.');
-                  } finally {
-                    setIsDownloading(false);
-                  }
-                }}
-              >
-                <Download size={16} />
-                {isDownloading ? 'Baixando...' : 'Baixar filtrados'}
-              </button>
+                    try {
+                      const filteredRows = await api.getNfeLancamentos(filters);
+                      setRows(filteredRows);
+                      const entries = filteredRows.map(row => ({ chave: formatCellValue(row.chave_nfe), json_xml: row.json_xml }));
+                      await downloadNfeXmlZip(entries, 'lancamentos-nfe-filtrados.zip');
+                    } catch (err: any) {
+                      setError(err.message || 'Erro ao baixar lancamentos filtrados.');
+                    } finally {
+                      setIsDownloading(false);
+                    }
+                  }}
+                >
+                  <Download size={16} />
+                  {isDownloading ? 'Baixando...' : 'Baixar filtrados'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -1581,7 +1583,7 @@ const NfeListarView = () => {
             <table className="w-full min-w-max border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data de lancamento</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data Emissão</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Origem</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Empresa</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Chave NFe</th>
@@ -1595,7 +1597,7 @@ const NfeListarView = () => {
               <tbody className="divide-y divide-slate-50">
                 {rows.map((row, rowIndex) => (
                   <tr key={String(row.id ?? rowIndex)} className="hover:bg-slate-50/70">
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_lancamento)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDatePt(row.data_emissao)}</td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <SistemaBadge value={row.sistema} />
                     </td>

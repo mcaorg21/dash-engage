@@ -21,6 +21,7 @@ router.use(authenticate);
 const municipioSql = `json_xml::jsonb #>> '{NFe,infNFe,dest,enderDest,xMun}'`;
 const cnpjTomadorSql = `json_xml::jsonb #>> '{NFe,infNFe,dest,CNPJ}'`;
 const empresaSql = `json_bd::jsonb #>> '{nfeProc,NFe,infNFe,emit,xFant}'`;
+const dataEmissaoSql = `(json_xml::jsonb #>> '{NFe,infNFe,ide,dhEmi}')::date`;
 
 router.get('/sistemas', async (req: AuthRequest, res) => {
   try {
@@ -114,12 +115,12 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
 
     if (typeof dataInicio === 'string' && dataInicio) {
       values.push(dataInicio);
-      filters.push(`data_lancamento::date >= $${values.length}`);
+      filters.push(`${dataEmissaoSql} >= $${values.length}`);
     }
 
     if (typeof dataFim === 'string' && dataFim) {
       values.push(dataFim);
-      filters.push(`data_lancamento::date <= $${values.length}`);
+      filters.push(`${dataEmissaoSql} <= $${values.length}`);
     }
 
     if (typeof chaveNfe === 'string' && chaveNfe.trim()) {
@@ -151,6 +152,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
       SELECT
         id,
         data_lancamento,
+        ${dataEmissaoSql} AS data_emissao,
         chave_nfe,
         tipo,
         sistema::text AS sistema,
@@ -161,7 +163,7 @@ router.get('/lancamentos', async (req: AuthRequest, res) => {
         json_xml
       FROM public.nfe_lancamentos_financeiros
       WHERE ${filters.join(' AND ')}
-      ORDER BY data_lancamento DESC, id DESC
+      ORDER BY ${dataEmissaoSql} DESC, id DESC
     `, values);
 
     res.json(result.rows);
