@@ -1590,8 +1590,7 @@ const NfeListarView = () => {
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Engage</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Fornecedor</th>
                   <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">CNPJ Fornecedor</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Chave NFe</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor Total Nota</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Chave NFe / Valor Total</th>
                   <th className="sticky right-0 whitespace-nowrap bg-slate-50 px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)]">
                     Download
                   </th>
@@ -1609,10 +1608,12 @@ const NfeListarView = () => {
                       {formatCellValue(row.empresa)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{formatCnpj(String(row.cnpj_fornecedor || ''))}</td>
-                    <td className="max-w-[360px] truncate whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700" title={formatChaveNfeComDest(row)}>
-                      {formatChaveNfeComDest(row)}
+                    <td className="max-w-[360px] px-4 py-3">
+                      <div className="truncate font-mono text-xs text-slate-700" title={formatChaveNfeComDest(row)}>
+                        {formatChaveNfeComDest(row)}
+                      </div>
+                      <div className="mt-0.5 font-medium text-slate-800">{formatCurrency(row.valor)}</div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(row.valor)}</td>
                     <td className="sticky right-0 whitespace-nowrap bg-white px-4 py-3 text-right shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)] group-hover:bg-slate-50">
                       <button
                         type="button"
