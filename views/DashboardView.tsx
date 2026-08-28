@@ -1662,20 +1662,37 @@ const computeValorLiquidoNfse = (row: NfseRecord) => {
   return roundMoney(Number(row.valor_total_servicos || 0) - totalTributos);
 };
 
-const resolveChaveNfse = (row: NfseRecord) => {
+const parseNfseJsonXml = (row: NfseRecord): any => {
   let jsonXml = row.json_xml;
   if (typeof jsonXml === 'string') {
     try { jsonXml = JSON.parse(jsonXml); } catch { return null; }
   }
-  const codigo = (jsonXml as any)?.Nfse?.InfNfse?.CodigoVerificacao;
+  return jsonXml;
+};
+
+const resolveChaveNfse = (row: NfseRecord) => {
+  const jsonXml = parseNfseJsonXml(row);
+  const codigo = jsonXml?.Nfse?.InfNfse?.CodigoVerificacao;
   return typeof codigo === 'string' && codigo.trim() !== '' ? codigo.trim() : null;
 };
 
+// Valor liquido informado pela propria prefeitura no XML da NFSe (ja desconta as retencoes)
+const getValorLiquidoFromXml = (row: NfseRecord): number | null => {
+  const jsonXml = parseNfseJsonXml(row);
+  const valor = jsonXml?.Nfse?.InfNfse?.ValoresNfse?.ValorLiquidoNfse;
+  if (valor === null || valor === undefined || valor === '') return null;
+  const parsed = Number(valor);
+  return Number.isNaN(parsed) ? null : roundMoney(parsed);
+};
+
 const resolveValorLiquido = (row: NfseRecord) => {
+  const fromXml = getValorLiquidoFromXml(row);
+  if (fromXml !== null) return fromXml;
+
   const stored = row.valor_liquido;
-  return stored !== null && stored !== undefined && stored !== ''
-    ? roundMoney(stored)
-    : computeValorLiquidoNfse(row);
+  if (stored !== null && stored !== undefined && stored !== '') return roundMoney(stored);
+
+  return computeValorLiquidoNfse(row);
 };
 
 const ValorLiquidoInput = ({ row, onSaved }: { row: NfseRecord; onSaved: (id: unknown, value: number) => void }) => {
