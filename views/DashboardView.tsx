@@ -1659,7 +1659,7 @@ const TIPO_SERVICO_BADGE_CLASS: Record<string, string> = {
 const computeValorLiquidoNfse = (row: NfseRecord) => {
   const totalTributos = [row.iss_retido, row.irrf, row.csll, row.pis, row.cofins, row.inss]
     .reduce<number>((sum, value) => sum + Number(value || 0), 0);
-  return roundMoney(Number(row.valor_total_servicos || 0) - totalTributos);
+  return roundMoney(resolveValorServicos(row) - totalTributos);
 };
 
 const parseNfseJsonXml = (row: NfseRecord): any => {
@@ -1674,6 +1674,23 @@ const resolveChaveNfse = (row: NfseRecord) => {
   const jsonXml = parseNfseJsonXml(row);
   const codigo = jsonXml?.Nfse?.InfNfse?.CodigoVerificacao;
   return typeof codigo === 'string' && codigo.trim() !== '' ? codigo.trim() : null;
+};
+
+// Valor dos servicos informado no XML da NFSe (usado quando a importacao gravou 0/vazio na coluna)
+const getValorServicosFromXml = (row: NfseRecord): number | null => {
+  const jsonXml = parseNfseJsonXml(row);
+  const valor = jsonXml?.Nfse?.InfNfse?.DeclaracaoPrestacaoServico?.InfDeclaracaoPrestacaoServico?.Servico?.Valores?.ValorServicos;
+  if (valor === null || valor === undefined || valor === '') return null;
+  const parsed = Number(valor);
+  return Number.isNaN(parsed) ? null : roundMoney(parsed);
+};
+
+const resolveValorServicos = (row: NfseRecord) => {
+  const stored = Number(row.valor_total_servicos || 0);
+  if (stored !== 0) return roundMoney(stored);
+
+  const fromXml = getValorServicosFromXml(row);
+  return fromXml !== null ? fromXml : 0;
 };
 
 // Valor liquido informado pela propria prefeitura no XML da NFSe (ja desconta as retencoes)
@@ -1904,7 +1921,7 @@ const NfseListaView = () => {
         [row.iss_retido, row.irrf, row.csll, row.pis, row.cofins, row.inss]
           .reduce((sum, value) => sum + Number(value || 0), 0)
       );
-      const valorServicos = roundMoney(row.valor_total_servicos);
+      const valorServicos = resolveValorServicos(row);
 
       return {
         'Numero da Nota': String(row.numero_nota ?? ''),
@@ -2200,7 +2217,7 @@ const NfseListaView = () => {
                           {formatCellValue(row.cnpj_emitente)}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(row.valor_total_servicos)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(resolveValorServicos(row))}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs">
                         <div className="grid grid-cols-[auto_auto] gap-x-3 gap-y-1">
                           {[
@@ -2502,7 +2519,7 @@ const NfseNaoConciliadasView = () => {
                           {formatCellValue(row.cnpj_emitente)}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(row.valor_total_servicos)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(resolveValorServicos(row))}</td>
                       <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>
                         {row.webviewlink ? (
                           <a href={String(row.webviewlink)} target="_blank" rel="noopener noreferrer"
