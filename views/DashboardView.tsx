@@ -1343,6 +1343,7 @@ const NfeListarView = () => {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
@@ -1396,6 +1397,65 @@ const NfeListarView = () => {
     };
   }, [appliedFilters]);
 
+  const fetchFilteredRows = async () => {
+    const filters = getCurrentFilters();
+    setAppliedFilters(filters);
+    const filteredRows = await api.getNfeLancamentos(filters);
+    setRows(filteredRows);
+    return filteredRows;
+  };
+
+  const handleDownloadXml = async () => {
+    setShowDownloadMenu(false);
+    setIsDownloading(true);
+    setError(null);
+
+    try {
+      const filteredRows = await fetchFilteredRows();
+      const entries = filteredRows.map(row => ({ chave: formatCellValue(row.chave_nfe), json_xml: row.json_xml }));
+      await downloadNfeXmlZip(entries, 'lancamentos-nfe-filtrados.zip');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao baixar lancamentos filtrados.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    setShowDownloadMenu(false);
+    setIsDownloading(true);
+    setError(null);
+
+    try {
+      const filteredRows = await fetchFilteredRows();
+      const exportRows = filteredRows.map(row => ({
+        'Data Emissao': formatDatePt(row.data_emissao),
+        'Numero Nota': String(row.numero_nota ?? ''),
+        'CNPJ Engage': formatCnpj(String(row.cnpj_tomador || '')),
+        Fornecedor: String(row.empresa ?? ''),
+        'CNPJ Fornecedor': formatCnpj(String(row.cnpj_fornecedor || '')),
+        'Chave NFe': String(row.chave_nfe ?? ''),
+        Valor: roundMoney(row.valor),
+      }));
+
+      const date = new Date().toISOString().slice(0, 10);
+      const XLSX = await import('xlsx');
+      const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      for (let r = 1; r <= exportRows.length; r += 1) {
+        const cell = worksheet[XLSX.utils.encode_cell({ r, c: 6 })];
+        if (cell) cell.z = '0.00';
+      }
+      worksheet['!cols'] = [14, 14, 20, 32, 20, 50, 15].map(wch => ({ wch }));
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'NFe');
+      XLSX.writeFile(workbook, `nfe-nao-conciliadas-${date}.xlsx`);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao baixar lancamentos filtrados.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -1412,31 +1472,45 @@ const NfeListarView = () => {
             Lancamentos financeiros sem NFe Sysemp, ordenados por ID.
           </p>
         </div>
-        <button
-          type="button"
-          disabled={isLoading || isDownloading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:border-emerald-500 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-300 sm:w-auto"
-          onClick={async () => {
-            const filters = getCurrentFilters();
-            setAppliedFilters(filters);
-            setIsDownloading(true);
-            setError(null);
-
-            try {
-              const filteredRows = await api.getNfeLancamentos(filters);
-              setRows(filteredRows);
-              const entries = filteredRows.map(row => ({ chave: formatCellValue(row.chave_nfe), json_xml: row.json_xml }));
-              await downloadNfeXmlZip(entries, 'lancamentos-nfe-filtrados.zip');
-            } catch (err: any) {
-              setError(err.message || 'Erro ao baixar lancamentos filtrados.');
-            } finally {
-              setIsDownloading(false);
-            }
-          }}
-        >
-          <Download size={16} />
-          {isDownloading ? 'Baixando...' : 'Baixar filtrados'}
-        </button>
+        <div className="relative w-full sm:w-auto">
+          <button
+            type="button"
+            disabled={isLoading || isDownloading}
+            onClick={() => setShowDownloadMenu(current => !current)}
+            aria-expanded={showDownloadMenu}
+            aria-haspopup="menu"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:border-emerald-500 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-300 sm:w-auto"
+          >
+            <Download size={16} />
+            {isDownloading ? 'Baixando...' : 'Baixar filtrados'}
+            <ChevronDown size={15} className={`transition-transform ${showDownloadMenu ? 'rotate-180' : ''}`} />
+          </button>
+          {showDownloadMenu && (
+            <div
+              role="menu"
+              className="absolute right-0 z-20 mt-2 w-full min-w-52 overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-lg sm:w-52"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleDownloadXml}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+              >
+                <FileText size={16} className="text-emerald-600" />
+                Baixar Filtrados XML
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleDownloadExcel}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+              >
+                <FileSpreadsheet size={16} className="text-emerald-600" />
+                Baixar Filtrados Excel
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
