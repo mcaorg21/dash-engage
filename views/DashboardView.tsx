@@ -1703,6 +1703,15 @@ const NfeListarView = () => {
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-200 bg-slate-50">
+                  <td colSpan={6} className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Total</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-bold text-slate-800">
+                    {formatCurrency(roundMoney(rows.reduce((sum, row) => sum + Number(row.valor || 0), 0)))}
+                  </td>
+                  <td className="sticky right-0 whitespace-nowrap bg-slate-50 px-4 py-3 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)]"></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
