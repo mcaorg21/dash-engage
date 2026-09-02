@@ -145,9 +145,9 @@ router.get('/lista', async (req: AuthRequest, res) => {
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const result = await pool.query(
       `SELECT * FROM (
-        SELECT DISTINCT ON (numero_nota) *
+        SELECT DISTINCT ON (numero_nota, cnpj_emitente) *
         FROM controle_arquivos_drive ${where}
-        ORDER BY numero_nota, data_emissao DESC NULLS LAST
+        ORDER BY numero_nota, cnpj_emitente, data_emissao DESC NULLS LAST
       ) sub
       ORDER BY data_emissao DESC NULLS LAST
       LIMIT 500`,
