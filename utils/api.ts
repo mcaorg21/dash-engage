@@ -119,28 +119,6 @@ export interface NfseDashboardResponse {
   months: NfseDashboardMonth[];
 }
 
-export interface NfeDashboardMonth {
-  mes: string;
-  total: number;
-  valor_total: number;
-}
-
-export interface NfeFornecedorResumo {
-  mes: string;
-  empresa: string;
-  cnpj_fornecedor: string;
-  total: number;
-  valor_total: number;
-}
-
-export interface NfeTomadorResumo {
-  mes: string;
-  empresa: string;
-  cnpj_tomador: string;
-  total: number;
-  valor_total: number;
-}
-
 export interface NfeNotaResumo {
   id: number;
   data_emissao: string;
@@ -151,13 +129,11 @@ export interface NfeNotaResumo {
   cnpj_tomador: string;
   chave_nfe: string;
   valor: number;
+  frete: string | null;
+  devolucao: boolean;
 }
 
 export interface NfeDashboardResponse {
-  totalCancelado: number;
-  months: NfeDashboardMonth[];
-  fornecedoresPorMes: NfeFornecedorResumo[];
-  tomadoresPorMes: NfeTomadorResumo[];
   notas: NfeNotaResumo[];
 }
 

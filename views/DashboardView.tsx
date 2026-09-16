@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import JSZip from 'jszip';
-import { AlertCircle, BarChart3, Calendar, CalendarClock, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Package, Receipt, RefreshCw, Search, Tag, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
+import { AlertCircle, BarChart3, Calendar, CalendarClock, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Package, Receipt, RefreshCw, RotateCcw, Search, Tag, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
 import PlanilhasView from './FerramentasView';
 import MapeamentoServicosView from './MapeamentoServicosView';
@@ -1393,30 +1393,18 @@ const SortableTh = ({
 );
 
 const NfePainelView = () => {
-  const [rows, setRows] = useState<import('../utils/api').NfeDashboardMonth[]>([]);
-  const [fornecedoresPorMes, setFornecedoresPorMes] = useState<import('../utils/api').NfeFornecedorResumo[]>([]);
-  const [tomadoresPorMes, setTomadoresPorMes] = useState<import('../utils/api').NfeTomadorResumo[]>([]);
   const [notas, setNotas] = useState<import('../utils/api').NfeNotaResumo[]>([]);
-  const [totalCancelado, setTotalCancelado] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFornecedores, setSelectedFornecedores] = useState<Set<string>>(new Set());
   const [selectedTomadores, setSelectedTomadores] = useState<Set<string>>(new Set());
+  const [selectedFretes, setSelectedFretes] = useState<Set<string>>(new Set());
   const [buscaFornecedor, setBuscaFornecedor] = useState('');
   const [fornecedorSort, setFornecedorSort] = useState<ResumoSort>({ field: 'valor_total', dir: 'desc' });
   const [tomadorSort, setTomadorSort] = useState<ResumoSort>({ field: 'valor_total', dir: 'desc' });
   const [rangeInicio, setRangeInicio] = useState(() => `${new Date().getFullYear()}-01`);
   const [rangeFim, setRangeFim] = useState(() => `${new Date().getFullYear()}-12`);
-  const [chartTooltip, setChartTooltip] = useState<{
-    x: number;
-    y: number;
-    mes: string;
-    label: string;
-    value: number;
-    isCurrency: boolean;
-    id: string;
-  } | null>(null);
-  const [isChartTooltipPinned, setIsChartTooltipPinned] = useState(false);
+  const [devolucaoFiltro, setDevolucaoFiltro] = useState<'todas' | 'sim'>('todas');
 
   useEffect(() => {
     let cancelled = false;
@@ -1427,13 +1415,7 @@ const NfePainelView = () => {
 
       try {
         const data = await api.getNfeDashboard();
-        if (!cancelled) {
-          setRows(data.months ?? []);
-          setFornecedoresPorMes(data.fornecedoresPorMes ?? []);
-          setTomadoresPorMes(data.tomadoresPorMes ?? []);
-          setNotas(data.notas ?? []);
-          setTotalCancelado(data.totalCancelado ?? 0);
-        }
+        if (!cancelled) setNotas(data.notas ?? []);
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Erro ao carregar painel.');
       } finally {
@@ -1458,36 +1440,43 @@ const NfePainelView = () => {
 
   const toggleFornecedor = (key: string) => toggleInSet(setSelectedFornecedores, key);
   const toggleTomador = (key: string) => toggleInSet(setSelectedTomadores, key);
+  const toggleFrete = (key: string) => toggleInSet(setSelectedFretes, key);
 
   const toggleSort = (setSort: React.Dispatch<React.SetStateAction<ResumoSort>>, field: 'total' | 'valor_total') => {
     setSort(prev => (prev.field === field ? { field, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { field, dir: 'desc' }));
   };
 
-  const isWithinRange = (mes: unknown) => {
-    const key = String(mes).slice(0, 7);
+  const isWithinRange = (data: unknown) => {
+    const key = String(data).slice(0, 7);
     return (!rangeInicio || key >= rangeInicio) && (!rangeFim || key <= rangeFim);
   };
 
-  const rowsFiltradas = rows.filter(row => isWithinRange(row.mes));
-  const fornecedoresPorMesFiltrado = fornecedoresPorMes.filter(row => isWithinRange(row.mes));
-  const tomadoresPorMesFiltrado = tomadoresPorMes.filter(row => isWithinRange(row.mes));
+  const freteCategoria = (nota: import('../utils/api').NfeNotaResumo): 'cif' | 'fob' | 'outros' => {
+    if (nota.frete === '0' || nota.frete === '3') return 'cif';
+    if (nota.frete === '1' || nota.frete === '2' || nota.frete === '4') return 'fob';
+    return 'outros';
+  };
 
-  const totals = rowsFiltradas.reduce(
-    (acc, row) => ({
-      total: acc.total + Number(row.total || 0),
-      valorTotal: acc.valorTotal + Number(row.valor_total || 0),
-    }),
+  const notasNoRange = notas.filter(nota => isWithinRange(nota.data_emissao) && (devolucaoFiltro === 'todas' || nota.devolucao));
+
+  const totals = notasNoRange.reduce(
+    (acc, nota) => ({ total: acc.total + 1, valorTotal: acc.valorTotal + Number(nota.valor || 0) }),
+    { total: 0, valorTotal: 0 }
+  );
+
+  const devolucaoTotals = notasNoRange.reduce(
+    (acc, nota) => (nota.devolucao ? { total: acc.total + 1, valorTotal: acc.valorTotal + Number(nota.valor || 0) } : acc),
     { total: 0, valorTotal: 0 }
   );
 
   const fornecedoresResumo = (() => {
     const map = new Map<string, { empresa: string; cnpj_fornecedor: string; total: number; valor_total: number }>();
 
-    fornecedoresPorMesFiltrado.forEach(row => {
-      const key = `${row.cnpj_fornecedor}|${row.empresa}`;
-      const current = map.get(key) || { empresa: row.empresa, cnpj_fornecedor: row.cnpj_fornecedor, total: 0, valor_total: 0 };
-      current.total += Number(row.total || 0);
-      current.valor_total += Number(row.valor_total || 0);
+    notasNoRange.forEach(nota => {
+      const key = `${nota.cnpj_fornecedor}|${nota.empresa_fornecedor}`;
+      const current = map.get(key) || { empresa: nota.empresa_fornecedor, cnpj_fornecedor: nota.cnpj_fornecedor, total: 0, valor_total: 0 };
+      current.total += 1;
+      current.valor_total += Number(nota.valor || 0);
       map.set(key, current);
     });
 
@@ -1497,15 +1486,32 @@ const NfePainelView = () => {
   const tomadoresResumo = (() => {
     const map = new Map<string, { empresa: string; cnpj_tomador: string; total: number; valor_total: number }>();
 
-    tomadoresPorMesFiltrado.forEach(row => {
-      const key = row.cnpj_tomador;
-      const current = map.get(key) || { empresa: row.empresa, cnpj_tomador: row.cnpj_tomador, total: 0, valor_total: 0 };
-      current.total += Number(row.total || 0);
-      current.valor_total += Number(row.valor_total || 0);
+    notasNoRange.forEach(nota => {
+      const key = nota.cnpj_tomador;
+      const current = map.get(key) || { empresa: nota.empresa_tomador, cnpj_tomador: nota.cnpj_tomador, total: 0, valor_total: 0 };
+      current.total += 1;
+      current.valor_total += Number(nota.valor || 0);
       map.set(key, current);
     });
 
     return Array.from(map.values());
+  })();
+
+  const freteResumo = (() => {
+    const map = new Map<string, { chave: string; label: string; total: number; valor_total: number }>();
+    const labels: Record<string, string> = { cif: 'CIF', fob: 'FOB', outros: 'Outros / Sem frete' };
+
+    notasNoRange.forEach(nota => {
+      const chave = freteCategoria(nota);
+      const current = map.get(chave) || { chave, label: labels[chave], total: 0, valor_total: 0 };
+      current.total += 1;
+      current.valor_total += Number(nota.valor || 0);
+      map.set(chave, current);
+    });
+
+    return (['cif', 'fob', 'outros'] as const)
+      .map(chave => map.get(chave))
+      .filter((row): row is { chave: string; label: string; total: number; valor_total: number } => !!row && row.total > 0);
   })();
 
   const fornecedoresFiltrados = (() => {
@@ -1535,35 +1541,21 @@ const NfePainelView = () => {
     return `${selectedTomadores.size} CNPJs Engage`;
   })();
 
-  const notasFiltradas = notas.filter(nota => {
-    if (!isWithinRange(nota.data_emissao)) return false;
-    if (selectedFornecedores.size > 0 && !selectedFornecedores.has(`${nota.cnpj_fornecedor}|${nota.empresa_fornecedor}`)) return false;
-    if (selectedTomadores.size > 0 && !selectedTomadores.has(nota.cnpj_tomador)) return false;
-    return true;
-  });
-
-  const chartRows = (() => {
-    if (selectedFornecedores.size === 0 && selectedTomadores.size === 0) return rowsFiltradas;
-
-    const porMes = new Map<string, { total: number; valor_total: number }>();
-    notasFiltradas.forEach(nota => {
-      const mes = String(nota.data_emissao).slice(0, 7);
-      const current = porMes.get(mes) || { total: 0, valor_total: 0 };
-      current.total += 1;
-      current.valor_total += Number(nota.valor || 0);
-      porMes.set(mes, current);
-    });
-
-    return rowsFiltradas.map(row => {
-      const match = porMes.get(String(row.mes).slice(0, 7));
-      return { mes: row.mes, total: match?.total ?? 0, valor_total: match?.valor_total ?? 0 };
-    });
+  const selectedFreteLabel = (() => {
+    if (selectedFretes.size === 0) return null;
+    if (selectedFretes.size === 1) {
+      const chave = Array.from(selectedFretes)[0];
+      return freteResumo.find(f => f.chave === chave)?.label ?? null;
+    }
+    return `${selectedFretes.size} tipos de frete`;
   })();
 
-  const maxValue = Math.max(...chartRows.map(row => Number(row.total || 0)), 1);
-  const maxValorValue = Math.max(...chartRows.map(row => Number(row.valor_total || 0)), 1);
-
-  const chartFilterLabel = [selectedFornecedorLabel, selectedTomadorLabel].filter(Boolean).join(' + ');
+  const notasFiltradas = notasNoRange.filter(nota => {
+    if (selectedFornecedores.size > 0 && !selectedFornecedores.has(`${nota.cnpj_fornecedor}|${nota.empresa_fornecedor}`)) return false;
+    if (selectedTomadores.size > 0 && !selectedTomadores.has(nota.cnpj_tomador)) return false;
+    if (selectedFretes.size > 0 && !selectedFretes.has(freteCategoria(nota))) return false;
+    return true;
+  });
 
   const exportarExcel = async () => {
     const exportRows = notasFiltradas.map(nota => ({
@@ -1594,7 +1586,7 @@ const NfePainelView = () => {
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">NFe - Painel</h1>
+          <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">NFe - Painel de notas em transito</h1>
           <p className="mt-1 text-sm text-slate-500">Acompanhamento temporal das NFe emitidas.</p>
         </div>
         <button
@@ -1624,7 +1616,13 @@ const NfePainelView = () => {
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <DashboardCard title="Total NFe" value={totals.total} icon={Receipt} tone="bg-[var(--engage-blue-400)]/10 text-[var(--engage-blue-800)]" />
-            <DashboardCard title="Canceladas" value={totalCancelado} icon={AlertCircle} tone="bg-amber-50 text-amber-600" />
+            <DashboardCard
+              title="Notas de Devolucao"
+              value={devolucaoTotals.total}
+              icon={RotateCcw}
+              tone="bg-amber-50 text-amber-600"
+              details={[{ label: 'Valor', value: formatCurrency(devolucaoTotals.valorTotal) }]}
+            />
             <DashboardCard title="Valor Total" value={totals.valorTotal} format="currency" icon={FileText} tone="bg-emerald-50 text-emerald-600" />
           </div>
 
@@ -1648,38 +1646,44 @@ const NfePainelView = () => {
                   className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 outline-none focus:border-[var(--engage-blue-400)]"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-slate-400">Devolucao</label>
+                <select
+                  value={devolucaoFiltro}
+                  onChange={e => setDevolucaoFiltro(e.target.value as 'todas' | 'sim')}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 outline-none focus:border-[var(--engage-blue-400)]"
+                >
+                  <option value="todas">Todas</option>
+                  <option value="sim">Sim</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
-              <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Por fornecedor</h2>
-                  <p className="text-sm text-slate-500">Quantidade e valor total emitido por fornecedor. Clique em um ou mais fornecedores para filtrar o grafico abaixo.</p>
+              <div className="mb-4 space-y-2">
+                <h2 className="text-lg font-bold text-slate-900">Por fornecedor</h2>
+                <div className="relative">
+                  <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={buscaFornecedor}
+                    onChange={e => setBuscaFornecedor(e.target.value)}
+                    placeholder="Buscar fornecedor..."
+                    className="w-full rounded-lg border border-slate-200 py-1.5 pl-8 pr-3 text-sm text-slate-700 outline-none focus:border-[var(--engage-blue-400)]"
+                  />
                 </div>
-                <div className="flex items-center gap-2">
-                  {selectedFornecedores.size > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedFornecedores(new Set())}
-                      className="inline-flex items-center gap-2 rounded-full bg-[var(--engage-blue-600)] px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[var(--engage-blue-500)]"
-                    >
-                      Filtrando: {selectedFornecedorLabel}
-                      <X size={14} />
-                    </button>
-                  )}
-                  <div className="relative">
-                    <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      value={buscaFornecedor}
-                      onChange={e => setBuscaFornecedor(e.target.value)}
-                      placeholder="Buscar fornecedor..."
-                      className="w-56 rounded-lg border border-slate-200 py-1.5 pl-8 pr-3 text-sm text-slate-700 outline-none focus:border-[var(--engage-blue-400)]"
-                    />
-                  </div>
-                </div>
+                {selectedFornecedores.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFornecedores(new Set())}
+                    className="inline-flex items-center gap-2 rounded-full bg-[var(--engage-blue-600)] px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[var(--engage-blue-500)]"
+                  >
+                    Filtrando: {selectedFornecedorLabel}
+                    <X size={14} />
+                  </button>
+                )}
               </div>
 
               {fornecedoresResumo.length === 0 ? (
@@ -1689,16 +1693,15 @@ const NfePainelView = () => {
                   <table className="w-full table-fixed text-left text-xs">
                     <thead className="sticky top-0 bg-white">
                       <tr className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                        <th className="w-[32%] px-3 py-1.5">Fornecedor</th>
-                        <th className="w-[24%] px-3 py-1.5">CNPJ</th>
-                        <SortableTh label="Quantidade" field="total" sort={fornecedorSort} onSort={field => toggleSort(setFornecedorSort, field)} widthClass="w-[14%]" />
-                        <SortableTh label="Valor Total" field="valor_total" sort={fornecedorSort} onSort={field => toggleSort(setFornecedorSort, field)} widthClass="w-[30%]" />
+                        <th className="w-[46%] px-3 py-1.5">Fornecedor</th>
+                        <SortableTh label="Quantidade" field="total" sort={fornecedorSort} onSort={field => toggleSort(setFornecedorSort, field)} widthClass="w-[18%]" />
+                        <SortableTh label="Valor Total" field="valor_total" sort={fornecedorSort} onSort={field => toggleSort(setFornecedorSort, field)} widthClass="w-[36%]" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {fornecedoresFiltrados.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="px-3 py-6 text-center text-xs font-medium text-slate-500">Nenhum fornecedor encontrado.</td>
+                          <td colSpan={3} className="px-3 py-6 text-center text-xs font-medium text-slate-500">Nenhum fornecedor encontrado.</td>
                         </tr>
                       )}
                       {fornecedoresFiltrados.map(row => {
@@ -1712,7 +1715,6 @@ const NfePainelView = () => {
                             className={`cursor-pointer transition-colors ${isSelected ? 'bg-[var(--engage-blue-600)]' : 'hover:bg-slate-50'}`}
                           >
                             <td className={`truncate px-3 py-1.5 font-medium uppercase ${isSelected ? 'text-white' : 'text-slate-800'}`} title={formatCellValue(row.empresa)}>{formatCellValue(row.empresa)}</td>
-                            <td className={`truncate px-3 py-1.5 ${isSelected ? 'text-white/90' : 'text-slate-600'}`}>{formatCellValue(row.cnpj_fornecedor)}</td>
                             <td className={`truncate px-3 py-1.5 ${isSelected ? 'text-white/90' : 'text-slate-600'}`}>{formatNumber(row.total)}</td>
                             <td className={`truncate px-3 py-1.5 font-medium ${isSelected ? 'text-white' : 'text-slate-800'}`}>{formatCurrency(row.valor_total)}</td>
                           </tr>
@@ -1725,11 +1727,8 @@ const NfePainelView = () => {
             </div>
 
             <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
-              <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Por CNPJ Engage</h2>
-                  <p className="text-sm text-slate-500">Quantidade e valor total recebido por CNPJ da Engage. Clique em um ou mais para filtrar o grafico abaixo.</p>
-                </div>
+              <div className="mb-4 space-y-2">
+                <h2 className="text-lg font-bold text-slate-900">Por CNPJ Engage</h2>
                 {selectedTomadores.size > 0 && (
                   <button
                     type="button"
@@ -1749,10 +1748,10 @@ const NfePainelView = () => {
                   <table className="w-full table-fixed text-left text-xs">
                     <thead className="sticky top-0 bg-white">
                       <tr className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                        <th className="w-[32%] px-3 py-1.5">CNPJ Engage</th>
-                        <th className="w-[24%] px-3 py-1.5">CNPJ</th>
-                        <SortableTh label="Quantidade" field="total" sort={tomadorSort} onSort={field => toggleSort(setTomadorSort, field)} widthClass="w-[14%]" />
-                        <SortableTh label="Valor Total" field="valor_total" sort={tomadorSort} onSort={field => toggleSort(setTomadorSort, field)} widthClass="w-[30%]" />
+                        <th className="w-[30%] px-3 py-1.5">CNPJ Engage</th>
+                        <th className="w-[24%] px-3 py-1.5">Final CNPJ</th>
+                        <SortableTh label="Quantidade" field="total" sort={tomadorSort} onSort={field => toggleSort(setTomadorSort, field)} widthClass="w-[12%]" />
+                        <SortableTh label="Valor Total" field="valor_total" sort={tomadorSort} onSort={field => toggleSort(setTomadorSort, field)} widthClass="w-[34%]" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -1767,7 +1766,7 @@ const NfePainelView = () => {
                             className={`cursor-pointer transition-colors ${isSelected ? 'bg-[var(--engage-blue-600)]' : 'hover:bg-slate-50'}`}
                           >
                             <td className={`truncate px-3 py-1.5 font-medium uppercase ${isSelected ? 'text-white' : 'text-slate-800'}`} title={formatCellValue(row.empresa)}>{formatCellValue(row.empresa)}</td>
-                            <td className={`truncate px-3 py-1.5 ${isSelected ? 'text-white/90' : 'text-slate-600'}`}>{formatCellValue(row.cnpj_tomador)}</td>
+                            <td className={`truncate px-3 py-1.5 font-mono ${isSelected ? 'text-white/90' : 'text-slate-600'}`} title={formatCellValue(row.cnpj_tomador)}>{String(row.cnpj_tomador || '').slice(-6) || '-'}</td>
                             <td className={`truncate px-3 py-1.5 ${isSelected ? 'text-white/90' : 'text-slate-600'}`}>{formatNumber(row.total)}</td>
                             <td className={`truncate px-3 py-1.5 font-medium ${isSelected ? 'text-white' : 'text-slate-800'}`}>{formatCurrency(row.valor_total)}</td>
                           </tr>
@@ -1778,217 +1777,53 @@ const NfePainelView = () => {
                 </div>
               )}
             </div>
-          </div>
 
-          <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
-            <div className="mb-6 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Evolucao mensal{chartFilterLabel ? ` - ${chartFilterLabel}` : ''}</h2>
-                <p className="text-sm text-slate-500">Quantidade de notas em barras, valor total em linha no eixo direito.</p>
+            <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+              <div className="mb-4 space-y-2">
+                <h2 className="text-lg font-bold text-slate-900">Por Frete</h2>
+                {selectedFretes.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFretes(new Set())}
+                    className="inline-flex items-center gap-2 rounded-full bg-[var(--engage-blue-600)] px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[var(--engage-blue-500)]"
+                  >
+                    Filtrando: {selectedFreteLabel}
+                    <X size={14} />
+                  </button>
+                )}
               </div>
-              <div className="flex flex-wrap gap-3 text-xs font-bold text-slate-500">
-                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[var(--engage-blue-600)]" /> Quantidade</span>
-                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Valor Total</span>
-              </div>
+
+              {freteResumo.length === 0 ? (
+                <div className="py-12 text-sm font-medium text-slate-500">Nenhum dado encontrado.</div>
+              ) : (
+                <table className="w-full table-fixed text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                      <th className="w-[40%] px-3 py-1.5">Frete</th>
+                      <th className="w-[30%] px-3 py-1.5">Quantidade</th>
+                      <th className="w-[30%] px-3 py-1.5">Valor Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {freteResumo.map(row => {
+                      const isSelected = selectedFretes.has(row.chave);
+
+                      return (
+                        <tr
+                          key={row.chave}
+                          onClick={() => toggleFrete(row.chave)}
+                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-[var(--engage-blue-600)]' : 'hover:bg-slate-50'}`}
+                        >
+                          <td className={`truncate px-3 py-1.5 font-medium ${isSelected ? 'text-white' : 'text-slate-800'}`}>{row.label}</td>
+                          <td className={`truncate px-3 py-1.5 ${isSelected ? 'text-white/90' : 'text-slate-600'}`}>{formatNumber(row.total)}</td>
+                          <td className={`truncate px-3 py-1.5 font-medium ${isSelected ? 'text-white' : 'text-slate-800'}`}>{formatCurrency(row.valor_total)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
-
-            {chartRows.length === 0 ? (
-              <div className="py-12 text-sm font-medium text-slate-500">Nenhum dado encontrado.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <svg viewBox="0 0 1040 360" className="min-w-[820px]">
-                  {[0, 1, 2, 3, 4].map(step => {
-                    const y = 40 + step * 58;
-                    const value = Math.round(maxValue - (maxValue / 4) * step);
-                    const valorValue = maxValorValue - (maxValorValue / 4) * step;
-
-                    return (
-                      <g key={step}>
-                        <line x1="56" y1={y} x2="940" y2={y} stroke="#e2e8f0" strokeWidth="1" />
-                        <text x="44" y={y + 4} textAnchor="end" className="fill-slate-400 text-[11px] font-bold">
-                          {formatNumber(value)}
-                        </text>
-                        <text x="952" y={y + 4} textAnchor="start" className="fill-emerald-500 text-[11px] font-bold">
-                          {formatCurrencyCompact(valorValue)}
-                        </text>
-                      </g>
-                    );
-                  })}
-
-                  {(() => {
-                    const chartWidth = 884;
-                    const chartHeight = 232;
-                    const groupWidth = chartWidth / chartRows.length;
-                    const barWidth = Math.max(Math.min(groupWidth / 2.2, 26), 8);
-                    const groupStart = (index: number) => 56 + index * groupWidth + groupWidth / 2;
-                    const yFor = (value: number) => 272 - (value / maxValue) * chartHeight;
-                    const yForValor = (value: number) => 272 - (value / maxValorValue) * chartHeight;
-                    const points = chartRows.map((row, index) => ({
-                      row,
-                      x: groupStart(index),
-                      y: yForValor(Number(row.valor_total || 0)),
-                      value: Number(row.valor_total || 0),
-                    }));
-                    const linePath = points
-                      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-                      .join(' ');
-                    const areaPath = points.length
-                      ? `${linePath} L ${points[points.length - 1].x} 272 L ${points[0].x} 272 Z`
-                      : '';
-
-                    return (
-                      <>
-                        {areaPath && (
-                          <path d={areaPath} fill="url(#nfeValorAreaGradient)" opacity="0.16" />
-                        )}
-                        <defs>
-                          <linearGradient id="nfeValorAreaGradient" x1="0" x2="0" y1="0" y2="1">
-                            <stop offset="0%" stopColor="#10b981" />
-                            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-                          </linearGradient>
-                        </defs>
-                        {chartRows.map((row, index) => {
-                          const value = Number(row.total || 0);
-                          const height = (value / maxValue) * chartHeight;
-                          const x = groupStart(index) - barWidth / 2;
-                          const y = yFor(value);
-                          const tooltipData = {
-                            x: x + barWidth / 2,
-                            y,
-                            mes: formatMonthPt(row.mes),
-                            label: 'Quantidade',
-                            value,
-                            isCurrency: false,
-                            id: `${row.mes}-total`,
-                          };
-
-                          return (
-                            <g key={`${row.mes}-bar`}>
-                              <rect
-                                x={x}
-                                y={40}
-                                width={barWidth}
-                                height={232}
-                                fill="transparent"
-                                className="cursor-pointer"
-                                onMouseEnter={() => { if (!isChartTooltipPinned) setChartTooltip(tooltipData); }}
-                                onMouseLeave={() => { if (!isChartTooltipPinned) setChartTooltip(null); }}
-                                onClick={() => {
-                                  if (isChartTooltipPinned && chartTooltip?.id === tooltipData.id) {
-                                    setIsChartTooltipPinned(false); setChartTooltip(null);
-                                  } else { setChartTooltip(tooltipData); setIsChartTooltipPinned(true); }
-                                }}
-                              />
-                              <rect
-                                x={x}
-                                y={y}
-                                width={barWidth}
-                                height={Math.max(height, value > 0 ? 10 : 0)}
-                                rx="4"
-                                fill="var(--engage-blue-600)"
-                                className="pointer-events-none transition-opacity"
-                              />
-                            </g>
-                          );
-                        })}
-                        {linePath && (
-                          <path
-                            d={linePath}
-                            fill="none"
-                            stroke="#10b981"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="4"
-                          />
-                        )}
-                        {points.map(point => (
-                          <g key={String(point.row.mes)}>
-                            <line x1={point.x} y1="40" x2={point.x} y2="272" stroke="#f1f5f9" strokeWidth="1" />
-                            <circle cx={point.x} cy={point.y} r="13" fill="#fff" opacity="0" />
-                            <circle
-                              cx={point.x}
-                              cy={point.y}
-                              r="6"
-                              fill="#fff"
-                              stroke="#10b981"
-                              strokeWidth="4"
-                              className="cursor-pointer transition-opacity hover:opacity-80"
-                              onMouseEnter={() => {
-                                if (isChartTooltipPinned) return;
-                                setChartTooltip({
-                                  x: point.x,
-                                  y: point.y,
-                                  mes: formatMonthPt(point.row.mes),
-                                  label: 'Valor Total',
-                                  value: point.value,
-                                  isCurrency: true,
-                                  id: `${point.row.mes}-valor_total`,
-                                });
-                              }}
-                              onMouseLeave={() => {
-                                if (!isChartTooltipPinned) setChartTooltip(null);
-                              }}
-                              onClick={() => {
-                                const nextTooltip = {
-                                  x: point.x,
-                                  y: point.y,
-                                  mes: formatMonthPt(point.row.mes),
-                                  label: 'Valor Total',
-                                  value: point.value,
-                                  isCurrency: true,
-                                  id: `${point.row.mes}-valor_total`,
-                                };
-
-                                if (isChartTooltipPinned && chartTooltip?.id === nextTooltip.id) {
-                                  setIsChartTooltipPinned(false);
-                                  setChartTooltip(null);
-                                  return;
-                                }
-
-                                setChartTooltip(nextTooltip);
-                                setIsChartTooltipPinned(true);
-                              }}
-                            />
-                            <text x={point.x} y="318" textAnchor="middle" className="fill-slate-500 text-[11px] font-bold">
-                              {formatMonthPt(point.row.mes)}
-                            </text>
-                          </g>
-                        ))}
-                        {chartTooltip && (
-                          (() => {
-                            const tooltipWidth = 210;
-                            const tooltipHeight = 56;
-                            const tooltipX = Math.min(Math.max(chartTooltip.x - tooltipWidth / 2, 62), 940 - tooltipWidth);
-                            const tooltipY = Math.min(Math.max(chartTooltip.y - tooltipHeight - 14, 12), 272 - tooltipHeight);
-                            const textX = tooltipX + 14;
-
-                            return (
-                              <g pointerEvents="none">
-                                <rect
-                                  x={tooltipX}
-                                  y={tooltipY}
-                                  width={tooltipWidth}
-                                  height={tooltipHeight}
-                                  rx="8"
-                                  fill="#0f172a"
-                                  opacity="0.96"
-                                />
-                                <text x={textX} y={tooltipY + 24} className="fill-white text-[12px] font-bold">
-                                  {chartTooltip.mes} - {chartTooltip.label}
-                                </text>
-                                <text x={textX} y={tooltipY + 44} className="fill-slate-200 text-[11px] font-medium">
-                                  {chartTooltip.isCurrency ? formatCurrency(chartTooltip.value) : `${formatNumber(chartTooltip.value)} notas`}
-                                </text>
-                              </g>
-                            );
-                          })()
-                        )}
-                      </>
-                    );
-                  })()}
-                </svg>
-              </div>
-            )}
           </div>
 
           <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">

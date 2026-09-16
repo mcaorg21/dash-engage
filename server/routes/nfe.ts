@@ -26,6 +26,13 @@ const numeroNotaSql = `json_xml::jsonb #>> '{NFe,infNFe,ide,nNF}'`;
 const nomeTomadorSql = `json_xml::jsonb #>> '{NFe,infNFe,dest,xNome}'`;
 const valorTotalNotaSql = `(json_xml::jsonb #>> '{NFe,infNFe,total,ICMSTot,vNF}')::numeric`;
 const dataEmissaoSql = `(json_xml::jsonb #>> '{NFe,infNFe,ide,dhEmi}')::date`;
+const cfopSql = `CASE
+  WHEN jsonb_typeof(json_xml::jsonb #> '{NFe,infNFe,det}') = 'array'
+    THEN json_xml::jsonb #>> '{NFe,infNFe,det,0,prod,CFOP}'
+  ELSE json_xml::jsonb #>> '{NFe,infNFe,det,prod,CFOP}'
+END`;
+const isDevolucaoSql = `(${cfopSql} LIKE '1%' OR ${cfopSql} LIKE '2%')`;
+const modFreteSql = `json_xml::jsonb #>> '{NFe,infNFe,transp,modFrete}'`;
 
 router.get('/sistemas', async (req: AuthRequest, res) => {
   try {
@@ -92,82 +99,25 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
     const allowed = await hasPermission(req, 'conciliacao_nfe_painel');
     if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
 
-    const [monthly, canceladasResult, fornecedores, tomadores, notas] = await Promise.all([
-      pool.query(`
-        SELECT
-          MAKE_DATE(EXTRACT(YEAR FROM ${dataEmissaoSql})::int, EXTRACT(MONTH FROM ${dataEmissaoSql})::int, 1) AS mes,
-          COUNT(*) FILTER (WHERE cancelada IS NOT TRUE)::int AS total,
-          COALESCE(SUM(COALESCE(${valorTotalNotaSql}, diferenca_valor)) FILTER (WHERE cancelada IS NOT TRUE), 0)::float AS valor_total
-        FROM public.nfe_lancamentos_financeiros
-        WHERE ${dataEmissaoSql} IS NOT NULL
-        GROUP BY 1
-        ORDER BY 1
-      `),
-      pool.query(`SELECT COUNT(*)::int AS total_cancelado FROM public.nfe_lancamentos_financeiros WHERE cancelada = true`),
-      pool.query(`
-        SELECT
-          MAKE_DATE(EXTRACT(YEAR FROM ${dataEmissaoSql})::int, EXTRACT(MONTH FROM ${dataEmissaoSql})::int, 1) AS mes,
-          ${empresaSql} AS empresa,
-          ${cnpjFornecedorSql} AS cnpj_fornecedor,
-          COUNT(*)::int AS total,
-          COALESCE(SUM(COALESCE(${valorTotalNotaSql}, diferenca_valor)), 0)::float AS valor_total
-        FROM public.nfe_lancamentos_financeiros
-        WHERE ${dataEmissaoSql} IS NOT NULL AND cancelada IS NOT TRUE
-        GROUP BY 1, 2, 3
-        ORDER BY valor_total DESC
-      `),
-      pool.query(`
-        SELECT
-          MAKE_DATE(EXTRACT(YEAR FROM ${dataEmissaoSql})::int, EXTRACT(MONTH FROM ${dataEmissaoSql})::int, 1) AS mes,
-          MIN(${nomeTomadorSql}) AS empresa,
-          ${cnpjTomadorSql} AS cnpj_tomador,
-          COUNT(*)::int AS total,
-          COALESCE(SUM(COALESCE(${valorTotalNotaSql}, diferenca_valor)), 0)::float AS valor_total
-        FROM public.nfe_lancamentos_financeiros
-        WHERE ${dataEmissaoSql} IS NOT NULL AND cancelada IS NOT TRUE
-        GROUP BY 1, 3
-        ORDER BY valor_total DESC
-      `),
-      pool.query(`
-        SELECT
-          id,
-          ${dataEmissaoSql} AS data_emissao,
-          ${numeroNotaSql} AS numero_nota,
-          ${empresaSql} AS empresa_fornecedor,
-          ${cnpjFornecedorSql} AS cnpj_fornecedor,
-          ${nomeTomadorSql} AS empresa_tomador,
-          ${cnpjTomadorSql} AS cnpj_tomador,
-          chave_nfe,
-          COALESCE(${valorTotalNotaSql}, diferenca_valor) AS valor
-        FROM public.nfe_lancamentos_financeiros
-        WHERE ${dataEmissaoSql} IS NOT NULL AND cancelada IS NOT TRUE
-        ORDER BY ${dataEmissaoSql} DESC
-      `),
-    ]);
-
-    const totalCancelado = Number(canceladasResult.rows[0]?.total_cancelado || 0);
+    const notas = await pool.query(`
+      SELECT
+        id,
+        ${dataEmissaoSql} AS data_emissao,
+        ${numeroNotaSql} AS numero_nota,
+        ${empresaSql} AS empresa_fornecedor,
+        ${cnpjFornecedorSql} AS cnpj_fornecedor,
+        ${nomeTomadorSql} AS empresa_tomador,
+        ${cnpjTomadorSql} AS cnpj_tomador,
+        chave_nfe,
+        COALESCE(${valorTotalNotaSql}, diferenca_valor) AS valor,
+        ${modFreteSql} AS frete,
+        ${isDevolucaoSql} AS devolucao
+      FROM public.nfe_lancamentos_financeiros
+      WHERE ${dataEmissaoSql} IS NOT NULL AND cancelada IS NOT TRUE
+      ORDER BY ${dataEmissaoSql} DESC
+    `);
 
     res.json({
-      totalCancelado,
-      months: monthly.rows.map(row => ({
-        mes: row.mes,
-        total: Number(row.total || 0),
-        valor_total: Number(row.valor_total || 0),
-      })),
-      fornecedoresPorMes: fornecedores.rows.map(row => ({
-        mes: row.mes,
-        empresa: row.empresa,
-        cnpj_fornecedor: row.cnpj_fornecedor,
-        total: Number(row.total || 0),
-        valor_total: Number(row.valor_total || 0),
-      })),
-      tomadoresPorMes: tomadores.rows.map(row => ({
-        mes: row.mes,
-        empresa: row.empresa,
-        cnpj_tomador: row.cnpj_tomador,
-        total: Number(row.total || 0),
-        valor_total: Number(row.valor_total || 0),
-      })),
       notas: notas.rows.map(row => ({
         id: row.id,
         data_emissao: row.data_emissao,
@@ -178,6 +128,8 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
         cnpj_tomador: row.cnpj_tomador,
         chave_nfe: row.chave_nfe,
         valor: Number(row.valor || 0),
+        frete: row.frete,
+        devolucao: Boolean(row.devolucao),
       })),
     });
   } catch (err) {
