@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import JSZip from 'jszip';
 import { AlertCircle, BarChart3, Calendar, CalendarClock, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, ExternalLink, FileSpreadsheet, FileText, LayoutDashboard, List, LogOut, Menu, Package, Receipt, RefreshCw, RotateCcw, Search, Tag, Upload, Users, Wrench, XCircle, X } from 'lucide-react';
 import UserManagementView from './UserManagementView';
@@ -25,6 +25,7 @@ const ferramentasTabs = [
 const nfseTabs = [
   { id: 'conciliacao_nfse_painel', label: 'Painel', icon: LayoutDashboard },
   { id: 'conciliacao_nfse_nao_conciliadas', label: 'Não Conciliadas', icon: AlertCircle },
+  { id: 'conciliacao_nfse_nao_conciliaveis', label: 'Não Conciliáveis', icon: XCircle },
   { id: 'conciliacao_nfse_lista', label: 'Lista', icon: List },
 ];
 
@@ -149,6 +150,81 @@ const CopyButton = ({ value, label = 'Copiar' }: { value: string; label?: string
     >
       {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
     </button>
+  );
+};
+
+const MultiSelectDropdown = ({
+  label,
+  options,
+  selected,
+  onChange,
+  placeholder = 'Todos',
+}: {
+  label: string;
+  options: string[];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+  placeholder?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = (value: string) => {
+    const next = new Set(selected);
+    if (next.has(value)) next.delete(value); else next.add(value);
+    onChange(next);
+  };
+
+  const summary = selected.size === 0
+    ? placeholder
+    : selected.size === 1
+      ? Array.from(selected)[0]
+      : `${selected.size} selecionados`;
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">{label}</label>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20"
+      >
+        <span className={`truncate ${selected.size === 0 ? 'text-slate-500' : 'text-slate-800'}`}>{summary}</span>
+        <ChevronDown size={14} className={`ml-1 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full min-w-[200px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+          {options.map(option => (
+            <label key={option} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+              <input
+                type="checkbox"
+                checked={selected.has(option)}
+                onChange={() => toggle(option)}
+                className="h-4 w-4 rounded border-slate-300 text-[var(--engage-blue-600)] focus:ring-[var(--engage-blue-400)]"
+              />
+              {option}
+            </label>
+          ))}
+          {selected.size > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange(new Set())}
+              className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-xs font-bold text-slate-500 hover:bg-slate-50"
+            >
+              Limpar selecao
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -2283,6 +2359,8 @@ const nfseMesAtual = () => {
 const NFSE_PAGE_SIZE = 30;
 
 const TIPOS_SERVICO = ['Transporte', 'Telecom', 'Terceirizado', 'Marketplace', 'Demais Servicos'];
+const TIPOS_SERVICO_NAO_CONCILIAVEIS_EXCLUIDOS = TIPOS_SERVICO.filter(tipo => tipo !== 'Transporte' && tipo !== 'Terceirizado');
+const TIPOS_SERVICO_NAO_CONCILIAVEIS = ['Transporte', 'Terceirizado'];
 
 const TIPO_SERVICO_BADGE_CLASS: Record<string, string> = {
   Transporte: 'border-blue-200 bg-blue-100 text-blue-700',
@@ -2945,10 +3023,10 @@ const NfseNaoConciliadasView = () => {
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [razaoSocialEmitente, setRazaoSocialEmitente] = useState('');
   const [canalVenda, setCanalVenda] = useState('');
-  const [tipoServico, setTipoServico] = useState('');
+  const [tipoServicos, setTipoServicos] = useState<Set<string>>(new Set());
   const [cnpjTomadors, setCnpjTomadors] = useState<string[]>([]);
   const [canaisVenda, setCanaisVenda] = useState<string[]>([]);
-  const [appliedFilters, setAppliedFilters] = useState({ numeroNota: '', chaveNfse: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', canalVenda: '', tipoServico: '' });
+  const [appliedFilters, setAppliedFilters] = useState<{ numeroNota: string; chaveNfse: string; dataInicio: string; dataFim: string; cnpjTomador: string; nomeArquivo: string; razaoSocialEmitente: string; canalVenda: string; tipoServico: string[] }>({ numeroNota: '', chaveNfse: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', canalVenda: '', tipoServico: [] });
   const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
 
   useEffect(() => {
@@ -2976,13 +3054,13 @@ const NfseNaoConciliadasView = () => {
 
   const applyFilters = () => {
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: numeroNota.trim(), chaveNfse: chaveNfse.trim(), dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), canalVenda, tipoServico });
+    setAppliedFilters({ numeroNota: numeroNota.trim(), chaveNfse: chaveNfse.trim(), dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), canalVenda, tipoServico: Array.from(tipoServicos) });
   };
 
   const clearFilters = () => {
-    setNumeroNota(''); setChaveNfse(''); setDataInicio(''); setDataFim(''); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCanalVenda(''); setTipoServico('');
+    setNumeroNota(''); setChaveNfse(''); setDataInicio(''); setDataFim(''); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCanalVenda(''); setTipoServicos(new Set());
     setDisplayLimit(NFSE_PAGE_SIZE);
-    setAppliedFilters({ numeroNota: '', chaveNfse: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', canalVenda: '', tipoServico: '' });
+    setAppliedFilters({ numeroNota: '', chaveNfse: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', canalVenda: '', tipoServico: [] });
   };
 
   const hasUrl = rows.length > 0 && rows.some(r => r.url);
@@ -3063,16 +3141,12 @@ const NfseNaoConciliadasView = () => {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Tipo de Servico</label>
-              <select value={tipoServico} onChange={event => setTipoServico(event.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20">
-                <option value="">Todos</option>
-                {TIPOS_SERVICO.map(item => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
-            </div>
+            <MultiSelectDropdown
+              label="Tipo de Servico"
+              options={TIPOS_SERVICO_NAO_CONCILIAVEIS_EXCLUIDOS}
+              selected={tipoServicos}
+              onChange={setTipoServicos}
+            />
             <div className="flex items-center gap-2">
               <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
                 Filtrar
@@ -3210,6 +3284,279 @@ const NfseNaoConciliadasView = () => {
   );
 };
 
+const NfseNaoConciliaveisView = () => {
+  const [rows, setRows] = useState<NfseRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [numeroNota, setNumeroNota] = useState('');
+  const [chaveNfse, setChaveNfse] = useState('');
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [cnpjTomador, setCnpjTomador] = useState('');
+  const [nomeArquivo, setNomeArquivo] = useState('');
+  const [razaoSocialEmitente, setRazaoSocialEmitente] = useState('');
+  const [canalVenda, setCanalVenda] = useState('');
+  const [tipoServicos, setTipoServicos] = useState<Set<string>>(new Set());
+  const [cnpjTomadors, setCnpjTomadors] = useState<string[]>([]);
+  const [canaisVenda, setCanaisVenda] = useState<string[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState<{ numeroNota: string; chaveNfse: string; dataInicio: string; dataFim: string; cnpjTomador: string; nomeArquivo: string; razaoSocialEmitente: string; canalVenda: string; tipoServico: string[] }>({ numeroNota: '', chaveNfse: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', canalVenda: '', tipoServico: [] });
+  const [displayLimit, setDisplayLimit] = useState(NFSE_PAGE_SIZE);
+
+  useEffect(() => {
+    api.getNfseCnpjs().then(values => setCnpjTomadors([...values].sort())).catch(() => {});
+    api.getNfseCanaisVenda().then(values => setCanaisVenda(Array.from(new Set([...values, ...CANAIS_VENDA_ADICIONAIS])).sort())).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await api.getNfseNaoConciliaveis(appliedFilters);
+        if (!cancelled) setRows(data);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Erro ao carregar NFSe.');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [appliedFilters]);
+
+  const applyFilters = () => {
+    setDisplayLimit(NFSE_PAGE_SIZE);
+    setAppliedFilters({ numeroNota: numeroNota.trim(), chaveNfse: chaveNfse.trim(), dataInicio, dataFim, cnpjTomador: cnpjTomador.trim(), nomeArquivo: nomeArquivo.trim(), razaoSocialEmitente: razaoSocialEmitente.trim(), canalVenda, tipoServico: Array.from(tipoServicos) });
+  };
+
+  const clearFilters = () => {
+    setNumeroNota(''); setChaveNfse(''); setDataInicio(''); setDataFim(''); setCnpjTomador(''); setNomeArquivo(''); setRazaoSocialEmitente(''); setCanalVenda(''); setTipoServicos(new Set());
+    setDisplayLimit(NFSE_PAGE_SIZE);
+    setAppliedFilters({ numeroNota: '', chaveNfse: '', dataInicio: '', dataFim: '', cnpjTomador: '', nomeArquivo: '', razaoSocialEmitente: '', canalVenda: '', tipoServico: [] });
+  };
+
+  const hasUrl = rows.length > 0 && rows.some(r => r.url);
+  const visibleRows = rows.slice(0, displayLimit);
+  const remaining = rows.length - displayLimit;
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-[var(--engage-blue-800)]">NFSe - Não Conciliáveis</h1>
+          {!isLoading && !error && (
+            <span className="rounded-full bg-[var(--engage-blue-400)]/15 px-3 py-0.5 text-sm font-bold text-[var(--engage-blue-800)]">
+              {rows.length} {rows.length === 1 ? 'registro' : 'registros'}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-slate-500">Notas de Transporte e Terceirizado — fora do fluxo padrão de conciliação.</p>
+      </div>
+
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-6 py-4">
+          <form
+            className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 lg:items-end"
+            onSubmit={event => { event.preventDefault(); applyFilters(); }}
+          >
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Razao Social</label>
+              <input type="search" value={razaoSocialEmitente} onChange={event => setRazaoSocialEmitente(event.target.value)}
+                placeholder="Buscar emitente"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Numero Nota</label>
+              <input type="search" value={numeroNota} onChange={event => setNumeroNota(event.target.value)}
+                placeholder="Buscar numero"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Chave NFSe</label>
+              <input type="search" value={chaveNfse} onChange={event => setChaveNfse(event.target.value)}
+                placeholder="Buscar chave"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Data Inicio</label>
+              <input type="date" value={dataInicio} onChange={event => setDataInicio(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Data Fim</label>
+              <input type="date" value={dataFim} onChange={event => setDataFim(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">CNPJ Tomador</label>
+              <select value={cnpjTomador} onChange={event => setCnpjTomador(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20">
+                <option value="">Todos</option>
+                {cnpjTomadors.map(item => (
+                  <option key={item} value={item}>{cnpjOptionLabel(item)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Nome Arquivo</label>
+              <input type="search" value={nomeArquivo} onChange={event => setNomeArquivo(event.target.value)}
+                placeholder="Buscar arquivo"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Canal de Venda</label>
+              <select value={canalVenda} onChange={event => setCanalVenda(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--engage-blue-400)] focus:ring-2 focus:ring-[var(--engage-blue-400)]/20">
+                <option value="">Todos</option>
+                {canaisVenda.map(item => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+            <MultiSelectDropdown
+              label="Tipo de Servico"
+              options={TIPOS_SERVICO_NAO_CONCILIAVEIS}
+              selected={tipoServicos}
+              onChange={setTipoServicos}
+            />
+            <div className="flex items-center gap-2">
+              <button type="submit" className="rounded-lg bg-[var(--engage-blue-600)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--engage-blue-500)]">
+                Filtrar
+              </button>
+              <button type="button" className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100" onClick={clearFilters}>
+                Limpar
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {isLoading && <div className="p-8 text-sm font-medium text-slate-500">Carregando NFSe...</div>}
+        {error && <div className="p-8 text-sm font-medium text-red-600">{error}</div>}
+        {!isLoading && !error && rows.length === 0 && (
+          <div className="p-8 text-sm font-medium text-slate-500">Nenhuma nota nao conciliavel encontrada.</div>
+        )}
+
+        {!isLoading && !error && rows.length > 0 && (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-max border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Emissao / Nota</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Emitente</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor Servicos</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Nome Arquivo</th>
+                    {hasUrl && <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">PDF</th>}
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Valor Liquido</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {visibleRows.map((row, rowIndex) => (
+                    <tr
+                      key={String(row.id ?? rowIndex)}
+                      className={`${rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-100/70'} transition-colors hover:bg-slate-200/70`}
+                    >
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="flex items-center gap-1.5 text-slate-700" title="Emissao">
+                          <Calendar size={13} className="shrink-0 text-slate-400" />
+                          {formatDatePt(row.data_emissao)}
+                        </div>
+                        <div className="mt-1 font-mono text-xs text-slate-500">Nota {formatCellValue(row.numero_nota)}</div>
+                        {resolveChaveNfse(row) && (
+                          <div className="mt-0.5 max-w-[140px] truncate font-mono text-[10px] text-slate-400" title={resolveChaveNfse(row) || ''}>
+                            {resolveChaveNfse(row)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="max-w-[280px] px-4 py-3">
+                        {(typeof row.canal_de_venda === 'string' && row.canal_de_venda.trim() !== '') || (typeof row.tipo_servico === 'string' && row.tipo_servico.trim() !== '') ? (
+                          <div className="mb-1 flex flex-wrap gap-1">
+                            {typeof row.canal_de_venda === 'string' && row.canal_de_venda.trim() !== '' && (
+                              row.canal_de_venda.trim() === CANAL_VENDA_REVISAR ? (
+                                <CanalVendaEditor
+                                  row={row}
+                                  canaisVenda={canaisVenda}
+                                  onSaved={(id, value) => {
+                                    setRows(prev => prev.map(item => (item.id === id ? { ...item, canal_de_venda: value } : item)));
+                                  }}
+                                />
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-[var(--engage-blue-400)]/30 bg-[var(--engage-blue-400)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--engage-blue-800)]">
+                                  <Tag size={11} className="shrink-0" />
+                                  {row.canal_de_venda}
+                                </span>
+                              )
+                            )}
+                            {typeof row.tipo_servico === 'string' && row.tipo_servico.trim() !== '' && (
+                              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${TIPO_SERVICO_BADGE_CLASS[row.tipo_servico] || 'border-slate-200 bg-slate-100 text-slate-600'}`}>
+                                {row.tipo_servico}
+                              </span>
+                            )}
+                          </div>
+                        ) : null}
+                        <div className="truncate text-slate-700" title={formatCellValue(row.razao_social_emitente)}>
+                          {formatCellValue(row.razao_social_emitente)}
+                        </div>
+                        <div className="mt-1 whitespace-nowrap font-mono text-xs text-slate-500">
+                          {formatCellValue(row.cnpj_emitente)}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{formatCurrency(resolveValorServicos(row))}</td>
+                      <td className="max-w-[320px] truncate whitespace-nowrap px-4 py-3 text-slate-700" title={formatCellValue(row.nome_arquivo)}>
+                        {row.webviewlink ? (
+                          <a href={String(row.webviewlink)} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-[var(--engage-blue-600)] hover:underline">
+                            <ExternalLink size={13} className="shrink-0" />
+                            {formatCellValue(row.nome_arquivo)}
+                          </a>
+                        ) : (
+                          formatCellValue(row.nome_arquivo)
+                        )}
+                      </td>
+                      {hasUrl && (
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          {row.url ? (
+                            <a href={String(row.url)} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--engage-blue-400)]/10 px-3 py-1.5 text-xs font-bold text-[var(--engage-blue-800)] transition-colors hover:bg-[var(--engage-blue-400)]/20">
+                              <Download size={14} /> PDF
+                            </a>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                      )}
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <ValorLiquidoInput
+                          row={row}
+                          onSaved={(id, value) => {
+                            setRows(prev => prev.map(item => (item.id === id ? { ...item, valor_liquido: value } : item)));
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {remaining > 0 && (
+              <div className="border-t border-slate-100 px-6 py-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => setDisplayLimit(prev => prev + NFSE_PAGE_SIZE)}
+                  className="rounded-lg border border-slate-200 px-5 py-2 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Ver mais ({remaining} restante{remaining !== 1 ? 's' : ''})
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void }) => {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -3223,6 +3570,7 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
   const [showLogoFallback, setShowLogoFallback] = useState(false);
   const [naoConciliadasCount, setNaoConciliadasCount] = useState(0);
   const [naoConciliadasNfseCount, setNaoConciliadasNfseCount] = useState(0);
+  const [naoConciliaveisNfseCount, setNaoConciliaveisNfseCount] = useState(0);
   const [naoConciliadasNfeCount, setNaoConciliadasNfeCount] = useState(0);
 
   useEffect(() => {
@@ -3262,6 +3610,14 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
     let cancelled = false;
     api.getNfseNaoConciliadasCount()
       .then(({ total }) => { if (!cancelled) setNaoConciliadasNfseCount(total); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getNfseNaoConciliaveisCount()
+      .then(({ total }) => { if (!cancelled) setNaoConciliaveisNfseCount(total); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
@@ -3428,6 +3784,11 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
                             {tab.id === 'conciliacao_nfse_nao_conciliadas' && naoConciliadasNfseCount > 0 && (
                               <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
                                 {naoConciliadasNfseCount}
+                              </span>
+                            )}
+                            {tab.id === 'conciliacao_nfse_nao_conciliaveis' && naoConciliaveisNfseCount > 0 && (
+                              <span className="ml-auto rounded-full bg-slate-400 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                                {naoConciliaveisNfseCount}
                               </span>
                             )}
                           </button>
@@ -3602,6 +3963,10 @@ const DashboardView = ({ user, onLogout }: { user: string; onLogout: () => void 
 
           {activeTab === 'conciliacao_nfse_nao_conciliadas' && hasPermission('conciliacao_nfse_nao_conciliadas') && (
             <NfseNaoConciliadasView />
+          )}
+
+          {activeTab === 'conciliacao_nfse_nao_conciliaveis' && hasPermission('conciliacao_nfse_nao_conciliaveis') && (
+            <NfseNaoConciliaveisView />
           )}
 
           {activeTab === 'conciliacao_nfse_lista' && hasPermission('conciliacao_nfse_lista') && (

@@ -10,6 +10,7 @@ const MENU_ITEMS = [
   { id: 'conciliacao_qivez_importar',   label: 'Importar',                  group: 'Conciliacao / CTe' },
   { id: 'conciliacao_nfse_painel',      label: 'Painel',                    group: 'Conciliacao / NFSe' },
   { id: 'conciliacao_nfse_nao_conciliadas', label: 'Nao Conciliadas',       group: 'Conciliacao / NFSe' },
+  { id: 'conciliacao_nfse_nao_conciliaveis', label: 'Nao Conciliaveis',     group: 'Conciliacao / NFSe' },
   { id: 'conciliacao_nfse_lista',       label: 'Lista',                     group: 'Conciliacao / NFSe' },
   { id: 'conciliacao_nfe_painel',       label: 'Painel',                    group: 'Conciliacao / NFe' },
   { id: 'conciliacao_nfe_listar',       label: 'Em Transito',               group: 'Conciliacao / NFe' },

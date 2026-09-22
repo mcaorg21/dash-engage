@@ -359,7 +359,7 @@ export const api = {
 
   getNfseDashboard: () => request<NfseDashboardResponse>('/nfse/dashboard'),
 
-  getNfseNaoConciliadas: (filters: { numeroNota?: string; chaveNfse?: string; dataInicio?: string; dataFim?: string; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; canalVenda?: string; tipoServico?: string } = {}) => {
+  getNfseNaoConciliadas: (filters: { numeroNota?: string; chaveNfse?: string; dataInicio?: string; dataFim?: string; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; canalVenda?: string; tipoServico?: string[] } = {}) => {
     const params = new URLSearchParams();
     if (filters.numeroNota) params.set('numeroNota', filters.numeroNota);
     if (filters.chaveNfse) params.set('chaveNfse', filters.chaveNfse);
@@ -369,13 +369,31 @@ export const api = {
     if (filters.nomeArquivo) params.set('nomeArquivo', filters.nomeArquivo);
     if (filters.razaoSocialEmitente) params.set('razaoSocialEmitente', filters.razaoSocialEmitente);
     if (filters.canalVenda) params.set('canalVenda', filters.canalVenda);
-    if (filters.tipoServico) params.set('tipoServico', filters.tipoServico);
+    (filters.tipoServico || []).forEach(tipo => params.append('tipoServico', tipo));
     const query = params.toString();
     return request<NfseRecord[]>(`/nfse/nao-conciliadas${query ? `?${query}` : ''}`);
   },
 
   getNfseNaoConciliadasCount: () =>
     request<{ total: number }>('/nfse/nao-conciliadas/count'),
+
+  getNfseNaoConciliaveis: (filters: { numeroNota?: string; chaveNfse?: string; dataInicio?: string; dataFim?: string; cnpjTomador?: string; nomeArquivo?: string; razaoSocialEmitente?: string; canalVenda?: string; tipoServico?: string[] } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.numeroNota) params.set('numeroNota', filters.numeroNota);
+    if (filters.chaveNfse) params.set('chaveNfse', filters.chaveNfse);
+    if (filters.dataInicio) params.set('dataInicio', filters.dataInicio);
+    if (filters.dataFim) params.set('dataFim', filters.dataFim);
+    if (filters.cnpjTomador) params.set('cnpjTomador', filters.cnpjTomador);
+    if (filters.nomeArquivo) params.set('nomeArquivo', filters.nomeArquivo);
+    if (filters.razaoSocialEmitente) params.set('razaoSocialEmitente', filters.razaoSocialEmitente);
+    if (filters.canalVenda) params.set('canalVenda', filters.canalVenda);
+    (filters.tipoServico || []).forEach(tipo => params.append('tipoServico', tipo));
+    const query = params.toString();
+    return request<NfseRecord[]>(`/nfse/nao-conciliaveis${query ? `?${query}` : ''}`);
+  },
+
+  getNfseNaoConciliaveisCount: () =>
+    request<{ total: number }>('/nfse/nao-conciliaveis/count'),
 
   updateNfseValorLiquido: (id: number | string, valorLiquido: number) =>
     request<{ valor_liquido: number }>(`/nfse/${id}/valor-liquido`, {

@@ -170,6 +170,7 @@ router.get('/nao-conciliadas/count', async (req: AuthRequest, res) => {
       SELECT COUNT(*)::int AS total
       FROM controle_arquivos_drive
       WHERE cancelada IS NOT TRUE AND existe_sysemp = false AND json_xml IS NOT NULL
+        AND (tipo_servico IS NULL OR tipo_servico NOT IN ('Transporte', 'Terceirizado'))
     `);
     res.json({ total: result.rows[0]?.total ?? 0 });
   } catch (err) {
@@ -185,7 +186,12 @@ router.get('/nao-conciliadas', async (req: AuthRequest, res) => {
 
     const { numeroNota, chaveNfse, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente, canalVenda, tipoServico } = req.query;
 
-    const conditions: string[] = ['cancelada IS NOT TRUE', 'existe_sysemp = false', 'json_xml IS NOT NULL'];
+    const conditions: string[] = [
+      'cancelada IS NOT TRUE',
+      'existe_sysemp = false',
+      'json_xml IS NOT NULL',
+      `(tipo_servico IS NULL OR tipo_servico NOT IN ('Transporte', 'Terceirizado'))`,
+    ];
     const values: unknown[] = [];
     let idx = 1;
 
@@ -222,8 +228,11 @@ router.get('/nao-conciliadas', async (req: AuthRequest, res) => {
       values.push(String(canalVenda));
     }
     if (tipoServico) {
-      conditions.push(`tipo_servico = $${idx++}`);
-      values.push(String(tipoServico));
+      const tipos = Array.isArray(tipoServico) ? tipoServico.map(String) : [String(tipoServico)];
+      if (tipos.length > 0) {
+        conditions.push(`tipo_servico = ANY($${idx++})`);
+        values.push(tipos);
+      }
     }
 
     const result = await pool.query(
@@ -236,6 +245,89 @@ router.get('/nao-conciliadas', async (req: AuthRequest, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('NFSe nao conciliadas list error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+router.get('/nao-conciliaveis/count', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_nfse_nao_conciliaveis');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const result = await pool.query(`
+      SELECT COUNT(*)::int AS total
+      FROM controle_arquivos_drive
+      WHERE cancelada IS NOT TRUE AND existe_sysemp = false AND json_xml IS NOT NULL
+        AND tipo_servico IN ('Transporte', 'Terceirizado')
+    `);
+    res.json({ total: result.rows[0]?.total ?? 0 });
+  } catch (err) {
+    console.error('NFSe nao conciliaveis count error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+router.get('/nao-conciliaveis', async (req: AuthRequest, res) => {
+  try {
+    const allowed = await hasPermission(req, 'conciliacao_nfse_nao_conciliaveis');
+    if (!allowed) { res.status(403).json({ error: 'Acesso negado' }); return; }
+
+    const { numeroNota, chaveNfse, dataInicio, dataFim, cnpjTomador, nomeArquivo, razaoSocialEmitente, canalVenda, tipoServico } = req.query;
+
+    const conditions: string[] = ['cancelada IS NOT TRUE', 'existe_sysemp = false', 'json_xml IS NOT NULL', `tipo_servico IN ('Transporte', 'Terceirizado')`];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (numeroNota) {
+      conditions.push(`CAST(numero_nota AS TEXT) ILIKE $${idx++}`);
+      values.push(`%${String(numeroNota)}%`);
+    }
+    if (chaveNfse) {
+      conditions.push(`(json_xml->'Nfse'->'InfNfse'->>'CodigoVerificacao') ILIKE $${idx++}`);
+      values.push(`%${String(chaveNfse)}%`);
+    }
+    if (dataInicio) {
+      conditions.push(`data_emissao >= $${idx++}`);
+      values.push(String(dataInicio));
+    }
+    if (dataFim) {
+      conditions.push(`data_emissao <= $${idx++}`);
+      values.push(String(dataFim));
+    }
+    if (cnpjTomador) {
+      conditions.push(`cnpj_tomador ILIKE $${idx++}`);
+      values.push(`%${String(cnpjTomador)}%`);
+    }
+    if (nomeArquivo) {
+      conditions.push(`nome_arquivo ILIKE $${idx++}`);
+      values.push(`%${String(nomeArquivo)}%`);
+    }
+    if (tipoServico) {
+      const tipos = Array.isArray(tipoServico) ? tipoServico.map(String) : [String(tipoServico)];
+      if (tipos.length > 0) {
+        conditions.push(`tipo_servico = ANY($${idx++})`);
+        values.push(tipos);
+      }
+    }
+    if (razaoSocialEmitente) {
+      conditions.push(`razao_social_emitente ILIKE $${idx++}`);
+      values.push(`%${String(razaoSocialEmitente)}%`);
+    }
+    if (canalVenda) {
+      conditions.push(`canal_de_venda = $${idx++}`);
+      values.push(String(canalVenda));
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM controle_arquivos_drive
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY data_emissao DESC NULLS LAST, id DESC`,
+      values
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('NFSe nao conciliaveis list error:', err);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
